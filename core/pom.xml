@@ -13,4 +13,12 @@
     <artifactId>core</artifactId>
     <packaging>jar</packaging>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.example</groupId>
+            <artifactId>db</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
 </project>

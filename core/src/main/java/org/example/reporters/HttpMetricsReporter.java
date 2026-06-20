@@ -12,9 +12,7 @@ public class HttpMetricsReporter implements MetricsReporter<HttpRequestTimer> {
     }
 
     @Override
-    public void report(HttpRequestTimer annotation, String methodName, double durationMs) {
-        String key = String.format("\"%s\"", annotation.path());
-
-        registry.record(key, durationMs);
+    public void report(HttpRequestTimer annotation, String methodName, double durationNanos) {
+        registry.record("HTTP Route", annotation.path(), durationNanos);
     }
 }

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS metrics (
      host_name VARCHAR(100),
      class_name VARCHAR(255),
      method_name VARCHAR(255),
-     duration_ms BIGINT,
+     duration_ns BIGINT,
      metadata JSONB
 );
 
