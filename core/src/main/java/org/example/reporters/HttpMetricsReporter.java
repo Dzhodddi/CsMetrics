@@ -1,10 +1,20 @@
 package org.example.reporters;
 
 import org.example.annotations.HttpRequestTimer;
+import org.example.metrics.MetricsRegistry;
 
 public class HttpMetricsReporter implements MetricsReporter<HttpRequestTimer> {
+
+    private final MetricsRegistry registry;
+
+    public HttpMetricsReporter(MetricsRegistry registry) {
+        this.registry = registry;
+    }
+
     @Override
-    public void report(HttpRequestTimer annotation, String methodName, long durationMs) {
-        System.out.printf("Sending HTTP Metric: Path=%s, Time=%dms%n", annotation.path(), durationMs);
+    public void report(HttpRequestTimer annotation, String methodName, double durationMs) {
+        String key = String.format("\"%s\"", annotation.path());
+
+        registry.record(key, durationMs);
     }
 }
