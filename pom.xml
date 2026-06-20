@@ -19,6 +19,7 @@
     <modules>
         <module>core</module>
         <module>server</module>
+        <module>db</module>
     </modules>
 
 </project>
