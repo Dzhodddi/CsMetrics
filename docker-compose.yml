@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:15-alpine
+    image: postgres:17.6
     container_name: metrics_postgres
     environment:
       POSTGRES_USER: postgres
