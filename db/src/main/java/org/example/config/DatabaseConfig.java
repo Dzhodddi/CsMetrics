@@ -1,4 +1,4 @@
-package org.example.utility;
+package org.example.config;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -10,10 +10,21 @@ public class DatabaseConfig {
     public static synchronized DataSource getDataSource() {
         if (dataSource == null) {
             HikariConfig config = new HikariConfig();
-            config.setJdbcUrl("jdbc:postgresql://localhost:5432/metrics_db");
+
+            String dbUrl = System.getenv("DB_URL");
+
+            if (dbUrl == null || dbUrl.isEmpty()) {
+                dbUrl = "jdbc:postgresql://127.0.0.1:5432/metrics_db";
+            }
+
+            config.setJdbcUrl(dbUrl);
             config.setUsername("postgres");
             config.setPassword("postgres");
             config.setMaximumPoolSize(10);
+
+            config.setConnectionTimeout(30000);
+            config.setIdleTimeout(600000);
+            config.setMaxLifetime(1800000);
 
             dataSource = new HikariDataSource(config);
 

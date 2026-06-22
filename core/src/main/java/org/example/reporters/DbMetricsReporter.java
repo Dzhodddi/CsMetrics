@@ -12,7 +12,7 @@ public class DbMetricsReporter implements MetricsReporter<DbQueryTimer> {
     }
 
     @Override
-    public void report(DbQueryTimer annotation, String javaMethodName, double durationNanos) {
+    public void report(DbQueryTimer annotation, String javaMethodName, long durationNanos) {
         String category = "DB: " + annotation.dbName();
         String action = annotation.queryAction();
         registry.record(category, action, durationNanos);

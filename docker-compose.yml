@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: metrics_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: metrics_db
+      TZ: "Europe/Kyiv"
+      PGTZ: "Europe/Kyiv"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: always
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: metrics_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_URL=jdbc:postgresql://db:5432/metrics_db
+      - TZ=Europe/Kyiv
+    depends_on:
+      - db
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ./metrics-ui
+      dockerfile: Dockerfile.frontend
+    container_name: metrics_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  pgdata:
