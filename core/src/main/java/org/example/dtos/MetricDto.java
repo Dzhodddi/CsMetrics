@@ -1,12 +1,11 @@
 package org.example.dtos;
 
-import org.example.db.RowMapper;
-
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import org.example.db.RowMapper;
 
 public record MetricDto(
         UUID id,
@@ -15,28 +14,28 @@ public record MetricDto(
         String hostName,
         String className,
         String methodName,
-        long durationNs,
+        Long durationNs,
         String metadata
 ) {
     public static final RowMapper<MetricDto> ROW_MAPPER = MetricDto::fromResultSet;
 
     private static MetricDto fromResultSet(ResultSet rs) throws SQLException {
         java.sql.Timestamp ts = rs.getTimestamp("recorded_at");
-        OffsetDateTime recordedAt = ts != null
-                ? ts.toInstant().atOffset(ZoneOffset.UTC)
-                : null;
+        OffsetDateTime recordedAt = ts != null ? ts.toInstant().atOffset(ZoneOffset.UTC) : null;
 
         Object rawId = rs.getObject("id");
-        UUID id = rawId instanceof UUID u ? u : UUID.fromString(rawId.toString());
+        UUID id = rawId == null ? null : (rawId instanceof UUID u ? u : UUID.fromString(rawId.toString()));
+
+        long duration = rs.getLong("duration_ns");
+        Long durationNs = rs.wasNull() ? null : duration;
 
         return new MetricDto(
-                id,
-                recordedAt,
+                id, recordedAt,
                 rs.getString("environment"),
                 rs.getString("host_name"),
                 rs.getString("class_name"),
                 rs.getString("method_name"),
-                rs.getLong("duration_ns"),
+                durationNs,
                 rs.getString("metadata")
         );
     }
