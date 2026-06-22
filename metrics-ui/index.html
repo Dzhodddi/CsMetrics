@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Performance Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-root">
+
+  <div id="loginPage" class="login-container">
+    <form id="loginForm" class="login-form">
+      <h2>Authorization</h2>
+      <input type="text" id="username" placeholder="Login" required>
+      <input type="password" id="password" placeholder="Password" required>
+      <button type="submit" id="loginBtn">Enter</button>
+    </form>
+  </div>
+
+  <div id="dashboardPage" class="dashboard-container hidden">
+    <header class="dashboard-header">
+      <h1>Server Performance Dashboard</h1>
+
+      <div class="action-buttons">
+        <button id="btnValidate" class="action-btn validate">Trigger Validate</button>
+        <button id="btnLoad" class="action-btn load">Trigger Load Data</button>
+      </div>
+
+      <button id="btnLogout" class="logout-btn">Logout</button>
+    </header>
+
+    <div id="errorMessage" class="error-message hidden"></div>
+    <div id="loader" class="loader hidden">Loading metrics...</div>
+
+    <div id="tableWrapper" class="table-wrapper">
+      <table class="metrics-table">
+        <thead>
+        <tr>
+          <th>Env</th>
+          <th>Host</th>
+          <th>Type</th>
+          <th>Executed Action / Route</th>
+          <th>Latency</th>
+          <th>Recorded At</th>
+        </tr>
+        </thead>
+        <tbody id="metricsTableBody">
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination-wrapper">
+      <button id="btnBack">Back</button>
+      <span id="pageInfo">Page 1 of 1</span>
+      <button id="btnNext">Next</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
