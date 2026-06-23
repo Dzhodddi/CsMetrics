@@ -30,7 +30,7 @@ public class DatabaseConfig {
 
             try (Database db = new Database(dataSource)) {
             } catch (Exception e) {
-                throw new RuntimeException("Не вдалося ініціалізувати базу даних", e);
+                throw new RuntimeException("Could not initialize database", e);
             }
         }
         return dataSource;

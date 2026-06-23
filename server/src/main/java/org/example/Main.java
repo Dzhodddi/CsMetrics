@@ -1,6 +1,7 @@
 package org.example;
 
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.sun.net.httpserver.HttpExchange;
@@ -9,95 +10,187 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.net.InetSocketAddress;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import javax.crypto.SecretKey;
 import org.example.annotations.DbQueryTimer;
 import org.example.annotations.HttpRequestTimer;
+import org.example.config.DatabaseConfig;
 import org.example.dtos.LoginDto;
 import org.example.dtos.MetricDto;
+import org.example.dtos.SecureCardDto;
 import org.example.dtos.TokenResponse;
 import org.example.proxies.ProxyFactory;
 import org.example.reporters.MetricsReporter;
-import org.example.repository.MetricRepository;
+import org.example.utility.JwtUtil;
+import org.example.cryptography.RsaUtil;
+import org.example.cryptography.AesUtil;
+import org.example.cryptography.SessionKeyStore;
 import org.example.service.DataService;
 import org.example.service.DefaultDataService;
-import org.example.service.MetricService;
-import org.example.config.DatabaseConfig;
-import org.example.utility.JwtUtil;
+import org.example.service.AuthService;
+import org.example.service.CardService;
+import org.example.service.ICardService;
+import org.example.service.UserService;
+import org.example.service.IUserService;
 
 public class Main {
     private static final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
 
-    public static void main(String[] args) throws Exception {
-        System.out.println("Starting metrics producer on HttpServer...");
+    private static final KeyPair rsaKeyPair;
+    private static final SessionKeyStore sessionKeyStore = new SessionKeyStore();
+    private static final ConcurrentLinkedQueue<MetricDto> metricsStorage = new ConcurrentLinkedQueue<>();
+    private static final SecretKey dbEncryptionKey = AesUtil.getSecretKeyFromBytes(
+            "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8)
+    );
 
-        MetricRepository metricRepository = new MetricRepository(DatabaseConfig.getDataSource());
-        MetricService metricService = new MetricService(metricRepository);
+    static {
+        try {
+            rsaKeyPair = RsaUtil.generateKeyPair();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize server RSA keys", e);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        DatabaseConfig.getDataSource();
         DefaultDataService realDataService = new DefaultDataService();
+        CardService realCardService = new CardService(dbEncryptionKey);
+        UserService realUserService = new UserService();
 
         Map<Class<? extends Annotation>, MetricsReporter> reporters = new HashMap<>();
+
         reporters.put(HttpRequestTimer.class, (annotation, methodName, durationMs) -> {
             HttpRequestTimer httpAnn = (HttpRequestTimer) annotation;
             Long durationNs = durationMs * 1_000_000L;
             String jsonMetadata = String.format("{\"api_path\": \"%s\", \"type\": \"http_request\"}", httpAnn.path());
-
             MetricDto dto = new MetricDto(UUID.randomUUID(), OffsetDateTime.now(ZoneId.of("Europe/Kyiv")), "DEV", "localhost",
-                    realDataService.getClass().getName(), methodName, durationNs, jsonMetadata);
-            metricService.recordMetric(dto);
+                    "HTTP_LAYER", methodName, durationNs, jsonMetadata);
+            metricsStorage.add(dto);
         });
 
         reporters.put(DbQueryTimer.class, (annotation, methodName, durationMs) -> {
             DbQueryTimer dbAnn = (DbQueryTimer) annotation;
             Long durationNs = durationMs * 1_000_000L;
             String jsonMetadata = String.format("{\"database\": \"%s\", \"query_action\": \"%s\"}", dbAnn.dbName(), dbAnn.queryAction());
-
             MetricDto dto = new MetricDto(UUID.randomUUID(), OffsetDateTime.now(ZoneId.of("Europe/Kyiv")), "DEV", "localhost",
-                    realDataService.getClass().getName(), methodName, durationNs, jsonMetadata);
-            metricService.recordMetric(dto);
+                    "DATABASE_LAYER", methodName, durationNs, jsonMetadata);
+            metricsStorage.add(dto);
         });
 
         DataService proxyDataService = ProxyFactory.createProxy(realDataService, DataService.class, reporters);
+        ICardService cardService = ProxyFactory.createProxy(realCardService, ICardService.class, reporters);
+        IUserService userService = ProxyFactory.createProxy(realUserService, IUserService.class, reporters);
+        AuthService authService = new AuthService();
 
         int port = 8080;
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 
-        server.createContext("/api/v1/login", exchange -> {
-            if (handleCorsAndOptions(exchange)) return;
+        server.createContext("/api/v1/internal/export-metrics", exchange -> {
+            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                List<MetricDto> exportedList = new ArrayList<>();
+                MetricDto metric;
+                while ((metric = metricsStorage.poll()) != null) {
+                    exportedList.add(metric);
+                }
+                sendResponse(exchange, 200, mapper.writeValueAsString(exportedList));
+            } else {
+                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
+            }
+        });
 
+        server.createContext("/api/v1/crypto/public-key", exchange -> {
+            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                String publicKeyBase64 = Base64.getEncoder().encodeToString(rsaKeyPair.getPublic().getEncoded());
+                sendResponse(exchange, 200, "{\"publicKey\": \"" + publicKeyBase64 + "\"}");
+            } else {
+                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
+            }
+        });
+
+        server.createContext("/api/v1/crypto/handshake", exchange -> {
             if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 try {
-                    LoginDto loginDto = mapper.readValue(exchange.getRequestBody(), LoginDto.class);
-
-                    try (Connection conn = DatabaseConfig.getDataSource().getConnection();
-                         PreparedStatement stmt = conn.prepareStatement("SELECT password, role FROM users WHERE username = ?")) {
-                        stmt.setString(1, loginDto.username());
-                        try (ResultSet rs = stmt.executeQuery()) {
-                            if (rs.next() && rs.getString("password").equals(loginDto.password())) {
-                                String role = rs.getString("role");
-                                String token = JwtUtil.createJwt(loginDto.username(), role);
-                                sendResponse(exchange, 200, mapper.writeValueAsString(new TokenResponse(token)));
-                                return;
-                            }
-                        }
-                    }
-                    sendResponse(exchange, 401, "{\"error\": \"Unauthorized: Invalid credentials\"}");
+                    JsonNode root = mapper.readTree(exchange.getRequestBody());
+                    int clientId = root.get("clientId").asInt();
+                    byte[] encryptedAesKey = Base64.getDecoder().decode(root.get("encryptedAesKey").asText());
+                    byte[] decryptedAesKeyBytes = RsaUtil.decrypt(encryptedAesKey, rsaKeyPair.getPrivate());
+                    SecretKey aesKey = AesUtil.getSecretKeyFromBytes(decryptedAesKeyBytes);
+                    sessionKeyStore.saveKey(clientId, aesKey);
+                    sendResponse(exchange, 200, "{\"status\": \"Key exchanged successfully\"}");
                 } catch (Exception e) {
-                    sendResponse(exchange, 400, "{\"error\": \"Bad request format\"}");
+                    sendResponse(exchange, 400, "{\"error\": \"Handshake failed\"}");
                 }
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
             }
         });
 
+        server.createContext("/api/v1/login", exchange -> {
+            String origin = exchange.getRequestHeaders().getFirst("Origin");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin != null ? origin : "http://127.0.0.1:3000");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, OPTIONS");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, X-Client-ID, Authorization");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
+
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(200, -1);
+                exchange.close();
+                return;
+            }
+
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                try {
+                    String clientIdHeader = exchange.getRequestHeaders().getFirst("X-Client-ID");
+                    if (clientIdHeader == null) {
+                        sendResponse(exchange, 400, "{\"error\": \"Missing X-Client-ID header\"}");
+                        return;
+                    }
+                    int clientId = Integer.parseInt(clientIdHeader);
+                    SecretKey aesKey = sessionKeyStore.getKey(clientId);
+                    if (aesKey == null) {
+                        sendResponse(exchange, 401, "{\"error\": \"Perform handshake first\"}");
+                        return;
+                    }
+
+                    JsonNode rootNode = mapper.readTree(exchange.getRequestBody());
+                    if (!rootNode.has("ciphertext")) {
+                        sendResponse(exchange, 400, "{\"error\": \"Missing ciphertext payload\"}");
+                        return;
+                    }
+
+                    byte[] encryptedBytes = Base64.getDecoder().decode(rootNode.get("ciphertext").asText());
+                    String decryptedJson = new String(AesUtil.decrypt(encryptedBytes, aesKey), StandardCharsets.UTF_8);
+                    LoginDto loginDto = mapper.readValue(decryptedJson, LoginDto.class);
+
+                    try {
+                        String token = authService.authenticateAndGetToken(loginDto);
+                        String rawResponse = mapper.writeValueAsString(new TokenResponse(token));
+                        byte[] encryptedResponseBytes = AesUtil.encrypt(rawResponse.getBytes(StandardCharsets.UTF_8), aesKey);
+                        String encryptedResponseBase64 = Base64.getEncoder().encodeToString(encryptedResponseBytes);
+                        sendResponse(exchange, 200, "{\"ciphertext\": \"" + encryptedResponseBase64 + "\"}");
+                    } catch (Exception e) {
+                        sendResponse(exchange, 401, "{\"error\": \"" + e.getMessage() + "\"}");
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    sendResponse(exchange, 400, "{\"error\": \"Bad request format or decryption error\"}");
+                }
+            }
+        });
+
         server.createContext("/api/v1/validate", exchange -> {
-            if (handleCorsAndOptions(exchange)) return;
             String role = validateJwtAndGetRole(exchange);
             if (role == null) return;
 
@@ -110,7 +203,6 @@ public class Main {
         });
 
         server.createContext("/api/v1/load-data", exchange -> {
-            if (handleCorsAndOptions(exchange)) return;
             String role = validateJwtAndGetRole(exchange);
             if (role == null) return;
 
@@ -122,91 +214,117 @@ public class Main {
             }
         });
 
-        server.createContext("/api/v1/metrics", exchange -> {
-            if (handleCorsAndOptions(exchange)) return;
+        server.createContext("/api/v1/cards", exchange -> {
             String role = validateJwtAndGetRole(exchange);
             if (role == null) return;
 
-            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                try {
-                    java.util.List<MetricDto> allMetrics = metricService.getMetrics();
+            String method = exchange.getRequestMethod();
+            try {
+                if ("POST".equalsIgnoreCase(method)) {
+                    SecureCardDto input = mapper.readValue(exchange.getRequestBody(), SecureCardDto.class);
+                    UUID newId = cardService.createCard(input);
+                    sendResponse(exchange, 201, "{\"status\":\"created\", \"id\":\"" + newId + "\"}");
+                    return;
+                }
 
-                    String query = exchange.getRequestURI().getQuery();
-                    int page = 1;
-                    int size = 8;
+                if ("GET".equalsIgnoreCase(method)) {
+                    List<SecureCardDto> cards = cardService.getCards(role);
+                    sendResponse(exchange, 200, mapper.writeValueAsString(cards));
+                    return;
+                }
+                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
+            } catch (Exception e) {
+                sendResponse(exchange, 400, "{\"error\": \"Bad request or error: " + e.getMessage() + "\"}");
+            }
+        });
 
-                    if (query != null) {
-                        java.util.Map<String, String> params = new java.util.HashMap<>();
-                        for (String param : query.split("&")) {
-                            String[] entry = param.split("=");
-                            if (entry.length > 1) {
-                                params.put(entry[0], entry[1]);
-                            }
-                        }
-                        if (params.containsKey("page")) page = Integer.parseInt(params.get("page"));
-                        if (params.containsKey("size")) size = Integer.parseInt(params.get("size"));
-                    }
+        server.createContext("/api/v1/cards/detail", exchange -> {
+            String role = validateJwtAndGetRole(exchange);
+            if (role == null) return;
 
-                    int totalItems = allMetrics.size();
-                    int fromIndex = (page - 1) * size;
-                    int toIndex = Math.min(fromIndex + size, totalItems);
+            String method = exchange.getRequestMethod();
+            String query = exchange.getRequestURI().getQuery();
+            UUID cardId = null;
 
-                    java.util.List<MetricDto> pagedMetrics;
-                    if (fromIndex >= totalItems || fromIndex < 0) {
-                        pagedMetrics = new java.util.ArrayList<>();
+            if (query != null && query.contains("id=")) {
+                cardId = UUID.fromString(query.split("id=")[1].split("&")[0]);
+            }
+
+            if (cardId == null) {
+                sendResponse(exchange, 400, "{\"error\": \"Missing id parameter\"}");
+                return;
+            }
+
+            try {
+                if ("PUT".equalsIgnoreCase(method)) {
+                    SecureCardDto input = mapper.readValue(exchange.getRequestBody(), SecureCardDto.class);
+                    boolean updated = cardService.updateCard(cardId, input);
+                    if (updated) {
+                        sendResponse(exchange, 200, "{\"status\": \"updated\"}");
                     } else {
-                        pagedMetrics = allMetrics.subList(fromIndex, toIndex);
+                        sendResponse(exchange, 404, "{\"error\": \"Card not found\"}");
                     }
+                    return;
+                }
 
-                    java.util.Map<String, Object> responseMap = new java.util.HashMap<>();
-                    responseMap.put("data", pagedMetrics);
-                    responseMap.put("currentPage", page);
-                    responseMap.put("totalPages", (int) Math.ceil((double) totalItems / size));
-                    responseMap.put("totalItems", totalItems);
+                if ("DELETE".equalsIgnoreCase(method)) {
+                    if (!"ROLE_ADMIN".equals(role)) {
+                        sendResponse(exchange, 403, "{\"error\": \"Forbidden\"}");
+                        return;
+                    }
+                    boolean deleted = cardService.deleteCard(cardId);
+                    if (deleted) {
+                        sendResponse(exchange, 200, "{\"status\": \"deleted\"}");
+                    } else {
+                        sendResponse(exchange, 404, "{\"error\": \"Card not found\"}");
+                    }
+                    return;
+                }
+                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
+            } catch (Exception e) {
+                sendResponse(exchange, 500, "{\"error\": \"Operation failed\"}");
+            }
+        });
 
-                    String jsonResponse = mapper.writeValueAsString(responseMap);
-                    sendResponse(exchange, 200, jsonResponse);
+        server.createContext("/api/v1/admin/users", exchange -> {
+            String role = validateJwtAndGetRole(exchange);
+            if (!"ROLE_ADMIN".equals(role)) {
+                sendResponse(exchange, 403, "{\"error\": \"Forbidden\"}");
+                return;
+            }
+
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                try {
+                    Map<String, Object> req = mapper.readValue(exchange.getRequestBody(), Map.class);
+                    String targetUser = (String) req.get("username");
+                    String action = (String) req.get("action");
+
+                    if ("block".equalsIgnoreCase(action)) {
+                        userService.blockUser(targetUser, (Boolean) req.get("block"));
+                    } else if ("change_role".equalsIgnoreCase(action)) {
+                        userService.changeRole(targetUser, (String) req.get("role"));
+                    } else if ("create".equalsIgnoreCase(action)) {
+                        userService.createUser(targetUser, (String) req.get("password"), (String) req.get("role"));
+                    }
+                    sendResponse(exchange, 200, "{\"status\": \"success\", \"message\": \"User action processed\"}");
                 } catch (Exception e) {
-                    e.printStackTrace();
-                    sendResponse(exchange, 500, "{\"error\": \"Failed to fetch metrics\"}");
+                    sendResponse(exchange, 400, "{\"error\": \"Invalid admin request structure\"}");
                 }
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
             }
         });
 
-        server.setExecutor(null);
+        server.setExecutor(Executors.newFixedThreadPool(12));
         server.start();
-        System.out.println("Server is running on http://127.0.0.1:" + port);
-    }
-
-    private static boolean handleCorsAndOptions(HttpExchange exchange) throws IOException {
-        String origin = exchange.getRequestHeaders().getFirst("Origin");
-        if (origin != null) {
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
-        } else {
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "http://127.0.0.1:3000");
-        }
-        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
-
-        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
-            exchange.sendResponseHeaders(200, -1);
-            exchange.close();
-            return true;
-        }
-        return false;
     }
 
     private static String validateJwtAndGetRole(HttpExchange exchange) throws IOException {
         String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
-
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             sendResponse(exchange, 401, "{\"error\": \"Unauthorized: Missing or malformed token\"}");
             return null;
         }
-
         try {
             String token = authHeader.substring(7);
             DecodedJWT decodedJWT = JwtUtil.decodeJWT(token);
@@ -218,7 +336,7 @@ public class Main {
     }
 
     private static void sendResponse(HttpExchange exchange, int code, String body) throws IOException {
-        byte[] bytes = body.getBytes("UTF-8");
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
         exchange.sendResponseHeaders(code, bytes.length == 0 ? -1 : bytes.length);
         if (bytes.length > 0) {

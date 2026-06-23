@@ -2,7 +2,6 @@ FROM maven:3.9.9-eclipse-temurin-23 AS builder
 WORKDIR /app
 
 COPY pom.xml .
-
 COPY db ./db
 COPY core ./core
 COPY server ./server
@@ -11,6 +10,11 @@ RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:23-jre-alpine
 WORKDIR /app
-COPY --from=builder /app/server/target/*.jar app.jar
+
+COPY --from=builder /app/core/target/*-shaded.jar core.jar
+COPY --from=builder /app/server/target/*-shaded.jar server.jar
+
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+EXPOSE 8081
+
+ENTRYPOINT ["sh", "-c", "java -jar server.jar & sleep 5 && java -jar core.jar"]
