@@ -20,8 +20,8 @@ public class MetricRepository {
     public void save(MetricDto metric) throws SQLException {
         String sql = """
             INSERT INTO metrics
-            (id, environment, host_name, class_name, method_name, duration_ns, metadata)
-            VALUES (:id, :environment, :hostName, :className, :methodName, :durationNs, :metadata::jsonb)
+            (id, environment, host_name, class_name, method_name, duration_ns, metadata, secured)
+            VALUES (:id, :environment, :hostName, :className, :methodName, :durationNs, :metadata::jsonb, :secured)
             """;
 
         Map<String, Object> params = new HashMap<>();
@@ -32,6 +32,7 @@ public class MetricRepository {
         params.put("methodName", metric.methodName());
         params.put("durationNs", metric.durationNs() != null ? metric.durationNs() : java.sql.Types.NULL);
         params.put("metadata", metric.metadata() != null ? metric.metadata() : "{}");
+        params.put("secured", metric.secured());
 
         try (Connection conn = dataSource.getConnection()) {
             QueryExecutor<MetricDto> executor = new QueryExecutor<>(conn, MetricDto.ROW_MAPPER);
@@ -41,7 +42,7 @@ public class MetricRepository {
 
     public List<MetricDto> findAll() throws SQLException {
         String sql = """
-                    SELECT id, recorded_at, environment, host_name, class_name, method_name, duration_ns, metadata 
+                    SELECT id, recorded_at, environment, host_name, class_name, method_name, duration_ns, metadata, secured 
                     FROM metrics
                     ORDER BY recorded_at DESC
                     LIMIT 1000

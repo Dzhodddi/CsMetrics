@@ -9,4 +9,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface HttpRequestTimer {
     String path();
+    boolean secured() default false;
 }

@@ -1,10 +1,11 @@
 package org.example.metrics;
 
 import org.example.dtos.MetricDto;
-import org.example.db.QueryExecutor;
+import org.example.tcp.TcpMetricClient;
 
-import java.util.UUID;
+import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -14,69 +15,54 @@ public class MetricsRegistry {
     private static final int MAX_ELEMENTS = 100;
 
     private final ConcurrentMap<MetricKey, AtomicReference<MetricBucket>> metrics = new ConcurrentHashMap<>();
-    private final QueryExecutor<MetricDto> executor;
+    private final TcpMetricClient tcpClient;
 
-    public MetricsRegistry(QueryExecutor<MetricDto> executor) {
-        this.executor = executor;
-
+    public MetricsRegistry(TcpMetricClient tcpClient) {
+        this.tcpClient = tcpClient;
         Runtime.getRuntime().addShutdownHook(new Thread(this::flushAll));
     }
 
-    public void record(String className, String methodName, double durationNanos) {
-        MetricKey key = new MetricKey(className, methodName);
+    public void record(String className, String methodName, double durationMs, boolean secured) {
+        MetricKey key = new MetricKey(className, methodName, secured);
 
         AtomicReference<MetricBucket> bucketRef = metrics.computeIfAbsent(
                 key, _ -> new AtomicReference<>(new MetricBucket())
         );
 
         MetricBucket currentBucket = bucketRef.get();
-
-        currentBucket.timings.add(durationNanos);
+        currentBucket.timings.add(durationMs);
         int currentSize = currentBucket.count.incrementAndGet();
 
         if (currentSize >= MAX_ELEMENTS) {
-
             MetricBucket freshBucket = new MetricBucket();
-
             if (bucketRef.compareAndSet(currentBucket, freshBucket)) {
                 flushBucketAsync(key, currentBucket);
             }
         }
     }
 
-    private CompletableFuture<Void> flushBucketAsync(MetricKey key, MetricBucket bucketToFlush) {
+    private CompletableFuture<Void> flushBucketAsync(MetricKey key, MetricBucket bucket) {
         return CompletableFuture.runAsync(() -> {
-            try {
-                var size = bucketToFlush.timings.size();
-                var ids = new UUID[size];
-                var durationsNs = new Long[size];
+            String env = System.getenv().getOrDefault("APP_ENV", "local");
+            String host = resolveHostName();
 
-                int index = 0;
-                for (var durationNanos : bucketToFlush.timings) {
-                    ids[index] = UUID.randomUUID();
-                    durationsNs[index] = durationNanos.longValue();
-                    index++;
-                }
-
-                var sql = """
-                    INSERT INTO metrics (id, recorded_at, class_name, method_name, duration_ns) 
-                    SELECT id_element, CURRENT_TIMESTAMP, :className, :methodName, duration_element 
-                    FROM unnest(:ids, :durationsNs) AS t(id_element, duration_element)
-                """;
-
-                executor.execQuery(sql, Map.of(
-                        "className", key.className(),
-                        "methodName", key.methodName(),
-                        "ids", ids,
-                        "durationsNs", durationsNs
-                ));
-
-                System.out.println("Flushed " + size + " metrics for " + key.methodName());
-
-            } catch (Exception e) {
-                System.err.println("Failed to flush metrics to database for " + key);
-                e.printStackTrace();
+            for (Double durationMs : bucket.timings) {
+                var dto = new MetricDto(
+                        UUID.randomUUID(),
+                        OffsetDateTime.now(),
+                        env,
+                        host,
+                        key.className(),
+                        key.methodName(),
+                        durationMs.longValue(),
+                        null,
+                        key.secured()
+                );
+                tcpClient.send(dto);
             }
+
+            System.out.printf("[MetricsRegistry] Flushed %d metrics for %s#%s%n",
+                    bucket.timings.size(), key.className(), key.methodName());
         });
     }
 
@@ -86,6 +72,14 @@ public class MetricsRegistry {
             if (!finalBucket.timings.isEmpty()) {
                 flushBucketAsync(entry.getKey(), finalBucket).join();
             }
+        }
+    }
+
+    private static String resolveHostName() {
+        try {
+            return java.net.InetAddress.getLocalHost().getHostName();
+        } catch (Exception e) {
+            return "unknown";
         }
     }
 }

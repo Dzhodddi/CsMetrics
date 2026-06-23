@@ -16,6 +16,6 @@ public class DbMetricsReporter implements MetricsReporter<DbQueryTimer> {
         String category = "DB: " + annotation.dbName();
         String action = annotation.queryAction();
         long durationNanos = durationMs * 1_000_000L;
-        registry.record(category, action, durationNanos);
+        registry.record(category, action, durationNanos, annotation.secured());
     }
 }
