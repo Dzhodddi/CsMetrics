@@ -1,11 +1,10 @@
 package org.example.service;
 
 import org.example.annotations.DbQueryTimer;
-import org.example.annotations.HttpRequestTimer;
 
 public class DefaultDataService implements DataService {
 
-    @DbQueryTimer(dbName = "ALTGATE", queryAction = "get_all_users")
+    @DbQueryTimer(dbName = "load some data", queryAction = "load some data")
     @Override
     public void loadData() {
         try {
@@ -14,7 +13,6 @@ public class DefaultDataService implements DataService {
         System.out.println("Data loaded from DB");
     }
 
-    @HttpRequestTimer(path = "/api/v1/validate")
     @Override
     public void fastValidation() {
         try { Thread.sleep(15); } catch (InterruptedException ignored) {}

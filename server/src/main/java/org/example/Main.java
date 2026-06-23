@@ -90,7 +90,106 @@ public class Main {
         int port = 8080;
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 
+        
+        IHttpRoutes routeProxy = ProxyFactory.createProxy(
+            new HttpRoutesImpl(proxyDataService, cardService, userService, authService),
+            IHttpRoutes.class,
+            reporters
+        );
+
         server.createContext("/api/v1/internal/export-metrics", exchange -> {
+            try { routeProxy.exportMetrics(exchange); } catch (Exception e) {}
+        });
+
+        server.createContext("/api/v1/login", exchange -> {
+            try { routeProxy.login(exchange); } catch (Exception e) {}
+        });
+
+        server.createContext("/api/v1/validate", exchange -> {
+            try { routeProxy.validate(exchange); } catch (Exception e) {}
+        });
+
+        server.createContext("/api/v1/load-data", exchange -> {
+            try { routeProxy.loadData(exchange); } catch (Exception e) {}
+        });
+
+        server.createContext("/api/v1/cards", exchange -> {
+            try { routeProxy.cards(exchange); } catch (Exception e) {}
+        });
+
+        server.createContext("/api/v1/cards/detail", exchange -> {
+            try { routeProxy.cardsDetail(exchange); } catch (Exception e) {}
+        });
+
+        server.createContext("/api/v1/admin/users", exchange -> {
+            try { routeProxy.adminUsers(exchange); } catch (Exception e) {}
+        });
+
+        server.setExecutor(Executors.newFixedThreadPool(12));
+        server.start();
+    }
+
+    private static String validateJwtAndGetRole(HttpExchange exchange) throws IOException {
+        String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            sendResponse(exchange, 401, "{\"error\": \"Unauthorized: Missing or malformed token\"}");
+            return null;
+        }
+        try {
+            String token = authHeader.substring(7);
+            DecodedJWT decodedJWT = JwtUtil.decodeJWT(token);
+            return decodedJWT.getClaim("role").asString();
+        } catch (Exception e) {
+            sendResponse(exchange, 401, "{\"error\": \"Unauthorized: Invalid token\"}");
+            return null;
+        }
+    }
+
+    private static void sendResponse(HttpExchange exchange, int code, String body) throws IOException {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+        exchange.sendResponseHeaders(code, bytes.length == 0 ? -1 : bytes.length);
+        if (bytes.length > 0) {
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        }
+        exchange.close();
+    }
+
+
+    public interface IHttpRoutes {
+        void exportMetrics(HttpExchange exchange) throws IOException;
+
+        void login(HttpExchange exchange) throws IOException;
+
+        void validate(HttpExchange exchange) throws IOException;
+
+        void loadData(HttpExchange exchange) throws IOException;
+
+        void cards(HttpExchange exchange) throws IOException;
+
+        void cardsDetail(HttpExchange exchange) throws IOException;
+
+        void adminUsers(HttpExchange exchange) throws IOException;
+    }
+
+    public static class HttpRoutesImpl implements IHttpRoutes {
+        private final DataService proxyDataService;
+        private final ICardService cardService;
+        private final IUserService userService;
+        private final AuthService authService;
+
+        public HttpRoutesImpl(DataService proxyDataService, ICardService cardService, IUserService userService, AuthService authService) {
+            this.proxyDataService = proxyDataService;
+            this.cardService = cardService;
+            this.userService = userService;
+            this.authService = authService;
+        }
+
+        @Override
+        @HttpRequestTimer(path = "/api/v1/internal/export-metrics")
+        public void exportMetrics(HttpExchange exchange) throws IOException {
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 List<MetricDto> exportedList = new ArrayList<>();
                 MetricDto metric;
@@ -101,9 +200,11 @@ public class Main {
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
             }
-        });
+        }
 
-        server.createContext("/api/v1/login", exchange -> {
+        @Override
+        @HttpRequestTimer(path = "/api/v1/login")
+        public void login(HttpExchange exchange) throws IOException {
             String origin = exchange.getRequestHeaders().getFirst("Origin");
             exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin != null ? origin : "http://127.0.0.1:3000");
             exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -154,9 +255,11 @@ public class Main {
                     sendResponse(exchange, 400, "{\"error\": \"Bad request format or decryption error\"}");
                 }
             }
-        });
+        }
 
-        server.createContext("/api/v1/validate", exchange -> {
+        @Override
+        @HttpRequestTimer(path = "/api/v1/validate", secured = true)
+        public void validate(HttpExchange exchange) throws IOException {
             String role = validateJwtAndGetRole(exchange);
             if (role == null) return;
 
@@ -166,11 +269,11 @@ public class Main {
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
             }
-        });
+        }
 
-        server.createContext("/api/v1/load-data", exchange -> {
-            String role = validateJwtAndGetRole(exchange);
-            if (role == null) return;
+        @Override
+        @HttpRequestTimer(path = "/api/v1/load-data", secured = true)
+        public void loadData(HttpExchange exchange) throws IOException {
 
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 proxyDataService.loadData();
@@ -178,9 +281,11 @@ public class Main {
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
             }
-        });
+        }
 
-        server.createContext("/api/v1/cards", exchange -> {
+        @Override
+        @HttpRequestTimer(path = "/api/v1/cards", secured = true)
+        public void cards(HttpExchange exchange) throws IOException {
             String role = validateJwtAndGetRole(exchange);
             if (role == null) return;
 
@@ -202,9 +307,11 @@ public class Main {
             } catch (Exception e) {
                 sendResponse(exchange, 400, "{\"error\": \"Bad request or error: " + e.getMessage() + "\"}");
             }
-        });
+        }
 
-        server.createContext("/api/v1/cards/detail", exchange -> {
+        @Override
+        @HttpRequestTimer(path = "/api/v1/cards/detail", secured = true)
+        public void cardsDetail(HttpExchange exchange) throws IOException {
             String role = validateJwtAndGetRole(exchange);
             if (role == null) return;
 
@@ -250,9 +357,11 @@ public class Main {
             } catch (Exception e) {
                 sendResponse(exchange, 500, "{\"error\": \"Operation failed\"}");
             }
-        });
+        }
 
-        server.createContext("/api/v1/admin/users", exchange -> {
+        @Override
+        @HttpRequestTimer(path = "/api/v1/admin/users", secured = true)
+        public void adminUsers(HttpExchange exchange) throws IOException {
             String role = validateJwtAndGetRole(exchange);
             if (!"ROLE_ADMIN".equals(role)) {
                 sendResponse(exchange, 403, "{\"error\": \"Forbidden\"}");
@@ -279,37 +388,7 @@ public class Main {
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
             }
-        });
-
-        server.setExecutor(Executors.newFixedThreadPool(12));
-        server.start();
-    }
-
-    private static String validateJwtAndGetRole(HttpExchange exchange) throws IOException {
-        String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            sendResponse(exchange, 401, "{\"error\": \"Unauthorized: Missing or malformed token\"}");
-            return null;
-        }
-        try {
-            String token = authHeader.substring(7);
-            DecodedJWT decodedJWT = JwtUtil.decodeJWT(token);
-            return decodedJWT.getClaim("role").asString();
-        } catch (Exception e) {
-            sendResponse(exchange, 401, "{\"error\": \"Unauthorized: Invalid token\"}");
-            return null;
         }
     }
 
-    private static void sendResponse(HttpExchange exchange, int code, String body) throws IOException {
-        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-        exchange.sendResponseHeaders(code, bytes.length == 0 ? -1 : bytes.length);
-        if (bytes.length > 0) {
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(bytes);
-            }
-        }
-        exchange.close();
-    }
 }
