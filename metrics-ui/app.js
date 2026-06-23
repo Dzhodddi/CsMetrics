@@ -341,9 +341,9 @@ async function fetchMetrics(page) {
                         const date = new Date(metric.recordedAt * (metric.recordedAt < 99999999999 ? 1000 : 1));
                         return date.toLocaleTimeString('uk-UA');
                     } else {
-                        const safeDateStr = metric.recordedAt.replace('T', ' ').replace(/-/g, '/');
-                        const date = new Date(safeDateStr);
-                        return date.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        const dateObj = new Date(metric.recordedAt);
+
+                        return dateObj.toLocaleTimeString('uk-UA');
                     }
                 });
 
@@ -380,15 +380,14 @@ function renderTable(metrics) {
         const isHttp = name.startsWith('/') || name.includes('validate') || name.includes('load');
         const badge = isHttp ? '<span class="badge latency">HTTP API</span>' : '<span class="badge cpu">DB QUERY</span>';
         const latency = metric.durationNs ? (metric.durationNs / 1000000).toFixed(2) : '0.00';
-
         let formattedDate = 'N/A';
         if (metric.recordedAt) {
             if (typeof metric.recordedAt === 'number') {
                 const timestamp = metric.recordedAt * (metric.recordedAt < 99999999999 ? 1000 : 1);
                 formattedDate = new Date(timestamp).toLocaleString('uk-UA');
             } else {
-                const safeDateStr = metric.recordedAt.replace('T', ' ').replace(/-/g, '/');
-                formattedDate = new Date(safeDateStr).toLocaleString('uk-UA');
+                formattedDate = new Date(metric.recordedAt)
+                    .toLocaleString('uk-UA');
             }
         }
 
@@ -407,7 +406,9 @@ function renderTable(metrics) {
 }
 
 async function triggerAction(endpoint, buttonId, defaultText) {
-    if (isActionLoading) return;
+    if (isActionLoading) {
+        return;
+    }
 
     isActionLoading = true;
     setGlobalButtonsState(true);
@@ -418,7 +419,9 @@ async function triggerAction(endpoint, buttonId, defaultText) {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!response.ok) throw new Error();
+        if (!response.ok) {
+            throw new Error();
+        }
         metricsCurrentPage = 1;
         await fetchMetrics(1);
     } catch (err) {

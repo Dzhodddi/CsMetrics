@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS metrics (
                                        id UUID PRIMARY KEY,
-                                       recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                       recorded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                        environment VARCHAR(50),
                                        host_name VARCHAR(100),
                                        class_name VARCHAR(255),

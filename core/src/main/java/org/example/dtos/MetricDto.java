@@ -20,8 +20,8 @@ public record MetricDto(
     public static final RowMapper<MetricDto> ROW_MAPPER = MetricDto::fromResultSet;
 
     private static MetricDto fromResultSet(ResultSet rs) throws SQLException {
-        java.sql.Timestamp ts = rs.getTimestamp("recorded_at");
-        OffsetDateTime recordedAt = ts != null ? ts.toInstant().atOffset(ZoneOffset.UTC) : null;
+        OffsetDateTime recordedAt =
+                rs.getObject("recorded_at", OffsetDateTime.class);
 
         Object rawId = rs.getObject("id");
         UUID id = rawId == null ? null : (rawId instanceof UUID u ? u : UUID.fromString(rawId.toString()));
