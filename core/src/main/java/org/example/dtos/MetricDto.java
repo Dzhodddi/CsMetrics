@@ -1,9 +1,9 @@
 package org.example.dtos;
 
+import java.io.Serializable;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.UUID;
 import org.example.db.RowMapper;
 
@@ -17,7 +17,11 @@ public record MetricDto(
         Long durationNs,
         String metadata,
         boolean secured
-) {
+) implements Serializable {
+
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
+
     public static final RowMapper<MetricDto> ROW_MAPPER = MetricDto::fromResultSet;
 
     private static MetricDto fromResultSet(ResultSet rs) throws SQLException {

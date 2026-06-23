@@ -3,12 +3,15 @@ package org.example.config;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import javax.sql.DataSource;
+import java.util.TimeZone;
 
 public class DatabaseConfig {
     private static HikariDataSource dataSource;
 
     public static synchronized DataSource getDataSource() {
         if (dataSource == null) {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+            System.setProperty("user.timezone", "UTC");
             HikariConfig config = new HikariConfig();
 
             String dbUrl = System.getenv("DB_URL");

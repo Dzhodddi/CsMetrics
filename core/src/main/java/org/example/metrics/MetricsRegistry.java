@@ -4,6 +4,8 @@ import org.example.dtos.MetricDto;
 import org.example.tcp.TcpMetricClient;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -46,6 +48,7 @@ public class MetricsRegistry {
             String env = System.getenv().getOrDefault("APP_ENV", "local");
             String host = resolveHostName();
 
+            List<MetricDto> dtos = new ArrayList<>(bucket.count.get());
             for (Double durationMs : bucket.timings) {
                 var dto = new MetricDto(
                         UUID.randomUUID(),
@@ -58,8 +61,9 @@ public class MetricsRegistry {
                         null,
                         key.secured()
                 );
-                tcpClient.send(dto);
+                dtos.add(dto);
             }
+            tcpClient.send(dtos);
 
             System.out.printf("[MetricsRegistry] Flushed %d metrics for %s#%s%n",
                     bucket.timings.size(), key.className(), key.methodName());

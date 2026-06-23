@@ -8,6 +8,7 @@ import java.io.ObjectInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -15,13 +16,13 @@ import java.util.function.Consumer;
 public class TcpMetricServer {
 
     private final int port;
-    private final Consumer<MetricDto> handler;
+    private final Consumer<List<MetricDto>> handler;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     private volatile boolean running = false;
     private ServerSocket serverSocket;
 
-    public TcpMetricServer(int port, Consumer<MetricDto> handler) {
+    public TcpMetricServer(int port, Consumer<List<MetricDto>> handler) {
         this.port = port;
         this.handler = handler;
     }
@@ -54,8 +55,10 @@ public class TcpMetricServer {
             while (running) {
                 try {
                     Object obj = ois.readObject();
-                    if (obj instanceof MetricDto dto) {
-                        handler.accept(dto);
+                    if (obj instanceof List<?> list) {
+                        @SuppressWarnings("unchecked")
+                        List<MetricDto> dtos = (List<MetricDto>) list;
+                        handler.accept(dtos);
                     } else {
                         System.err.println("TCP Server Unexpected object type: " + obj.getClass());
                     }

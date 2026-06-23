@@ -5,6 +5,7 @@ import org.example.dtos.MetricDto;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.List;
 
 
 public class TcpMetricClient implements AutoCloseable {
@@ -20,10 +21,10 @@ public class TcpMetricClient implements AutoCloseable {
         this.port = port;
     }
 
-    public synchronized void send(MetricDto dto) {
+    public synchronized void send(List<MetricDto> dtos) {
         try {
             ensureConnected();
-            oos.writeObject(dto);
+            oos.writeObject(dtos);
             oos.flush();
         } catch (IOException e) {
             System.err.println("[TcpMetricClient] Send failed, dropping metric: " + e.getMessage());
