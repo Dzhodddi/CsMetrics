@@ -28,11 +28,13 @@ public class TimerProcessor implements InvocationHandler {
 
             if (reporter != null) {
                 long start = System.nanoTime();
-                Object result = method.invoke(target, args);
-                long durationMs = (System.nanoTime() - start) / 1_000_000;
-
-                reporter.report(annotation, method.getName(), durationMs);
-                return result;
+                try {
+                    return method.invoke(target, args);
+                } finally {
+                    long durationNs = System.nanoTime() - start;
+                    reporter.report(annotation, method.getName(), durationNs);
+                    System.out.println("Timer for " + method.getName() + " took " + durationNs + " ns");
+                }
             }
         }
 

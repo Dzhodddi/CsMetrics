@@ -12,17 +12,15 @@ import java.lang.annotation.Annotation;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import javax.crypto.SecretKey;
+
 import org.example.annotations.DbQueryTimer;
 import org.example.annotations.HttpRequestTimer;
 import org.example.config.DatabaseConfig;
@@ -30,8 +28,12 @@ import org.example.dtos.LoginDto;
 import org.example.dtos.MetricDto;
 import org.example.dtos.SecureCardDto;
 import org.example.dtos.TokenResponse;
+import org.example.metrics.MetricsRegistry;
 import org.example.proxies.ProxyFactory;
+import org.example.reporters.DbMetricsReporter;
+import org.example.reporters.HttpMetricsReporter;
 import org.example.reporters.MetricsReporter;
+import org.example.tcp.TcpMetricClient;
 import org.example.utility.JwtUtil;
 import org.example.cryptography.RsaUtil;
 import org.example.cryptography.AesUtil;
@@ -55,6 +57,9 @@ public class Main {
             "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8)
     );
 
+    private static final String SERVER_HOST = "127.0.0.1";
+    private static final int SERVER_PORT = 9090;
+
     static {
         try {
             rsaKeyPair = RsaUtil.generateKeyPair();
@@ -65,29 +70,17 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         DatabaseConfig.getDataSource();
+        var metricClient = new TcpMetricClient(SERVER_HOST, SERVER_PORT);
         DefaultDataService realDataService = new DefaultDataService();
         CardService realCardService = new CardService(dbEncryptionKey);
         UserService realUserService = new UserService();
 
-        Map<Class<? extends Annotation>, MetricsReporter> reporters = new HashMap<>();
+        MetricsRegistry registry = new MetricsRegistry(metricClient);
+        Map<Class<? extends Annotation>, MetricsReporter> reporters = Map.of(
+                DbQueryTimer.class, new DbMetricsReporter(registry),
+                HttpRequestTimer.class, new HttpMetricsReporter(registry)
+        );
 
-        reporters.put(HttpRequestTimer.class, (annotation, methodName, durationMs) -> {
-            HttpRequestTimer httpAnn = (HttpRequestTimer) annotation;
-            Long durationNs = durationMs * 1_000_000L;
-            String jsonMetadata = String.format("{\"api_path\": \"%s\", \"type\": \"http_request\"}", httpAnn.path());
-            MetricDto dto = new MetricDto(UUID.randomUUID(), OffsetDateTime.now(ZoneId.of("Europe/Kyiv")), "DEV", "localhost",
-                    "HTTP_LAYER", methodName, durationNs, jsonMetadata);
-            metricsStorage.add(dto);
-        });
-
-        reporters.put(DbQueryTimer.class, (annotation, methodName, durationMs) -> {
-            DbQueryTimer dbAnn = (DbQueryTimer) annotation;
-            Long durationNs = durationMs * 1_000_000L;
-            String jsonMetadata = String.format("{\"database\": \"%s\", \"query_action\": \"%s\"}", dbAnn.dbName(), dbAnn.queryAction());
-            MetricDto dto = new MetricDto(UUID.randomUUID(), OffsetDateTime.now(ZoneId.of("Europe/Kyiv")), "DEV", "localhost",
-                    "DATABASE_LAYER", methodName, durationNs, jsonMetadata);
-            metricsStorage.add(dto);
-        });
 
         DataService proxyDataService = ProxyFactory.createProxy(realDataService, DataService.class, reporters);
         ICardService cardService = ProxyFactory.createProxy(realCardService, ICardService.class, reporters);
@@ -105,33 +98,6 @@ public class Main {
                     exportedList.add(metric);
                 }
                 sendResponse(exchange, 200, mapper.writeValueAsString(exportedList));
-            } else {
-                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
-            }
-        });
-
-        server.createContext("/api/v1/crypto/public-key", exchange -> {
-            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                String publicKeyBase64 = Base64.getEncoder().encodeToString(rsaKeyPair.getPublic().getEncoded());
-                sendResponse(exchange, 200, "{\"publicKey\": \"" + publicKeyBase64 + "\"}");
-            } else {
-                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
-            }
-        });
-
-        server.createContext("/api/v1/crypto/handshake", exchange -> {
-            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                try {
-                    JsonNode root = mapper.readTree(exchange.getRequestBody());
-                    int clientId = root.get("clientId").asInt();
-                    byte[] encryptedAesKey = Base64.getDecoder().decode(root.get("encryptedAesKey").asText());
-                    byte[] decryptedAesKeyBytes = RsaUtil.decrypt(encryptedAesKey, rsaKeyPair.getPrivate());
-                    SecretKey aesKey = AesUtil.getSecretKeyFromBytes(decryptedAesKeyBytes);
-                    sessionKeyStore.saveKey(clientId, aesKey);
-                    sendResponse(exchange, 200, "{\"status\": \"Key exchanged successfully\"}");
-                } catch (Exception e) {
-                    sendResponse(exchange, 400, "{\"error\": \"Handshake failed\"}");
-                }
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
             }

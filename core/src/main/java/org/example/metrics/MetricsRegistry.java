@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MetricsRegistry {
-    private static final int MAX_ELEMENTS = 100;
+    private static final int MAX_ELEMENTS = 5;
 
     private final ConcurrentMap<MetricKey, AtomicReference<MetricBucket>> metrics = new ConcurrentHashMap<>();
     private final TcpMetricClient tcpClient;
@@ -24,7 +24,7 @@ public class MetricsRegistry {
         Runtime.getRuntime().addShutdownHook(new Thread(this::flushAll));
     }
 
-    public void record(String className, String methodName, double durationMs, boolean secured) {
+    public void record(String className, String methodName, long durationNs, boolean secured) {
         MetricKey key = new MetricKey(className, methodName, secured);
 
         AtomicReference<MetricBucket> bucketRef = metrics.computeIfAbsent(
@@ -32,7 +32,7 @@ public class MetricsRegistry {
         );
 
         MetricBucket currentBucket = bucketRef.get();
-        currentBucket.timings.add(durationMs);
+        currentBucket.timings.add(durationNs);
         int currentSize = currentBucket.count.incrementAndGet();
 
         if (currentSize >= MAX_ELEMENTS) {
@@ -49,7 +49,7 @@ public class MetricsRegistry {
             String host = resolveHostName();
 
             List<MetricDto> dtos = new ArrayList<>(bucket.count.get());
-            for (Double durationMs : bucket.timings) {
+            for (Long durationNs : bucket.timings) {
                 var dto = new MetricDto(
                         UUID.randomUUID(),
                         OffsetDateTime.now(),
@@ -57,7 +57,7 @@ public class MetricsRegistry {
                         host,
                         key.className(),
                         key.methodName(),
-                        durationMs.longValue(),
+                        durationNs,
                         null,
                         key.secured()
                 );
