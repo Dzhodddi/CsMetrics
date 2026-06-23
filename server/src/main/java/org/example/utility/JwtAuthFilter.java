@@ -35,7 +35,7 @@ public class JwtAuthFilter implements Filter {
         }
 
         String uri = req.getRequestURI();
-        if (uri.endsWith("/login") || uri.endsWith("/login/") || uri.contains("/crypto/")) {
+        if (uri.endsWith("/login") || uri.endsWith("/login/")) {
             chain.doFilter(request, response);
             return;
         }

@@ -2,10 +2,8 @@ package org.example.config;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
-import org.example.utility.PasswordUtil;
 
 public class Database implements AutoCloseable {
 
@@ -22,31 +20,19 @@ public class Database implements AutoCloseable {
 
             statement.execute("""
                 CREATE TABLE IF NOT EXISTS users (
-                         id SERIAL PRIMARY KEY,
-                         username VARCHAR(50) UNIQUE NOT NULL,
-                         password VARCHAR(128) NOT NULL,
-                         salt VARCHAR(50) NOT NULL,
-                         role VARCHAR(20) NOT NULL,
-                         is_blocked BOOLEAN NOT NULL DEFAULT FALSE
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE NOT NULL,
+                    password VARCHAR(128) NOT NULL,
+                    role VARCHAR(20) NOT NULL
                 )
                 """);
 
-            var rs = statement.executeQuery("SELECT COUNT(*) FROM users");
-            if (rs.next() && rs.getInt(1) == 0) {
-                insertUser(connection, "admin", "admin123", "ROLE_ADMIN");
-                insertUser(connection, "user", "user123", "ROLE_READER");
-            }
-
             statement.execute("""
-                    CREATE TABLE IF NOT EXISTS secure_cards (
-                            id UUID PRIMARY KEY,
-                            title VARCHAR(100) NOT NULL,
-                            holder_name VARCHAR(100) NOT NULL,
-                            encrypted_card_number VARCHAR(255) NOT NULL,
-                            encrypted_cvv VARCHAR(50) NOT NULL,
-                            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-                        );
-                        """);
+                INSERT INTO users (username, password, role) VALUES 
+                ('admin', 'admin123', 'ROLE_ADMIN'),
+                ('user', 'user123', 'ROLE_USER')
+                ON CONFLICT (username) DO NOTHING
+                """);
 
             statement.execute("""
                 CREATE TABLE IF NOT EXISTS metrics (
@@ -61,26 +47,24 @@ public class Database implements AutoCloseable {
                 )
                 """);
 
+            statement.execute("""
+                CREATE INDEX IF NOT EXISTS idx_metrics_recorded_at 
+                ON metrics (recorded_at DESC)
+                """);
+
+            statement.execute("""
+                CREATE INDEX IF NOT EXISTS idx_metrics_method_time 
+                ON metrics (class_name, method_name, recorded_at DESC)
+                """);
+
             System.out.println("Database schema initialized successfully.");
+
         } catch (SQLException e) {
             throw new RuntimeException("Database init failed", e);
         }
     }
 
-    private void insertUser(Connection conn, String username, String password, String role) throws SQLException {
-        String salt = PasswordUtil.generateSalt();
-        String hashedPassword = PasswordUtil.hashPassword(password, salt);
-
-        String sql = "INSERT INTO users (username, password, salt, role) VALUES (?, ?, ?, ?)";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, username);
-            pstmt.setString(2, hashedPassword);
-            pstmt.setString(3, salt);
-            pstmt.setString(4, role);
-            pstmt.executeUpdate();
-        }
-    }
-
     @Override
-    public void close() {}
+    public void close() {
+    }
 }
