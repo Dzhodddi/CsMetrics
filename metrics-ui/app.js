@@ -266,7 +266,7 @@ async function handleCreateUser(e) {
         if (!response.ok) {
             throw new Error();
         }
-        alert("User registered cleanly.");
+        alert("User registered!");
         document.getElementById('createUserForm').reset();
     } catch (err) {
         alert("Failed to generate custom profile parameters natively.");
@@ -295,8 +295,10 @@ async function handleUserAdminAction(actionType, structuralState) {
             },
             body: JSON.stringify(payload)
         });
-        if (!response.ok) throw new Error();
-        alert(`Action ${actionType} completed successfully.`);
+        if (!response.ok) {
+            throw new Error();
+        }
+        alert(`Action ${actionType} completed successfully!`);
         document.getElementById('actionUsername').value = '';
     } catch (err) {
         alert("Administrative execution failed.");
