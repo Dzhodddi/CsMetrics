@@ -15,7 +15,8 @@ public record MetricDto(
         String className,
         String methodName,
         Long durationNs,
-        String metadata
+        String metadata,
+        boolean secured
 ) {
     public static final RowMapper<MetricDto> ROW_MAPPER = MetricDto::fromResultSet;
 
@@ -36,7 +37,8 @@ public record MetricDto(
                 rs.getString("class_name"),
                 rs.getString("method_name"),
                 durationNs,
-                rs.getString("metadata")
+                rs.getString("metadata"),
+                rs.getBoolean("secured")
         );
     }
 }

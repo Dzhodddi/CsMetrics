@@ -1,3 +1,3 @@
 package org.example.metrics;
 
-public record MetricKey(String className, String methodName) {}
+public record MetricKey(String className, String methodName, boolean secured) {}

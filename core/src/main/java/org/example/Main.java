@@ -146,7 +146,8 @@ public class Main {
                                         rs.getString("class_name"),
                                         rs.getString("method_name"),
                                         rs.getLong("duration_ns"),
-                                        rs.getString("metadata")
+                                        rs.getString("metadata"),
+                                        rs.getBoolean("secured")
                                 ));
                             }
                         }
