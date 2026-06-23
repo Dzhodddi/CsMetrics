@@ -1,0 +1,495 @@
+{
+  "info": {
+    "_postman_id": "6e250f22-ebb1-4f4e-aceb-8a342d5a1017",
+    "name": "CsMetrics Telemetry & Auth API",
+    "description": "API collection for the CsMetrics Java HttpServer. Includes routes for secure cards, user administration, and internal metrics.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "44257974",
+    "_collection_link": "https://go.postman.co/collection/44257974-6e250f22-ebb1-4f4e-aceb-8a342d5a1017?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Internal / Metrics",
+      "item": [
+        {
+          "name": "Export Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/internal/export-metrics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "internal",
+                "export-metrics"
+              ]
+            },
+            "description": "Polls the ConcurrentLinkedQueue and exports gathered metrics."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login (Encrypted)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 1. Ensure the request was successful",
+                  "if (pm.response.code === 200) {",
+                  "    try {",
+                  "        // 2. Parse the outer response: { \"ciphertext\": \"...\" }",
+                  "        var responseData = pm.response.json();",
+                  "        ",
+                  "        if (responseData.ciphertext) {",
+                  "            pm.collectionVariables.set(\"token\", responseData.ciphertext);",
+                  "        } else {",
+                  "            console.warn(\"No 'ciphertext' field found in the response.\");",
+                  "        }",
+                  "    } catch (e) {",
+                  "        console.error(\"Failed to parse the response or extract the token.\", e);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Client-ID",
+                "value": "1",
+                "description": "Must match a clientId registered in SessionKeyStore"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "login"
+              ]
+            },
+            "description": "Note: The payload must be an AES-encrypted, Base64-encoded string representing the LoginDto: `{\"username\": \"admin\", \"password\": \"password\"}`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "General Actions",
+      "item": [
+        {
+          "name": "Fast Validation",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/validate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "validate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Load DB Data",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/load-data",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "load-data"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Secure Cards",
+      "item": [
+        {
+          "name": "Get Cards",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/cards",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cards"
+              ]
+            },
+            "description": "If user is ROLE_ADMIN, decodes the card numbers. Otherwise returns [FORBIDDEN]."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Card",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"title\": \"Primary Groceries\",\n  \"holderName\": \"Alice Smith\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cvv\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/cards",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cards"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Card Detail",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{card_id}}\",\n  \"title\": \"Updated Card Title\",\n  \"holderName\": \"Alice Smith\",\n  \"cardNumber\": \"4222222222222222\",\n  \"cvv\": \"999\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/cards/detail?id={{card_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cards",
+                "detail"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{card_id}}",
+                  "description": "The UUID of the card"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Card Detail",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/cards/detail?id={{card_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cards",
+                "detail"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{card_id}}"
+                }
+              ]
+            },
+            "description": "Requires ROLE_ADMIN"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"new_admin\",\n  \"action\": \"create\",\n  \"password\": \"supersecret\",\n  \"role\": \"ROLE_ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN token"
+          },
+          "response": []
+        },
+        {
+          "name": "Change User Role",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"target_user\",\n  \"action\": \"change_role\",\n  \"role\": \"ROLE_USER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN token"
+          },
+          "response": []
+        },
+        {
+          "name": "Block/Unblock User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"target_user\",\n  \"action\": \"block\",\n  \"block\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN token"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "PASTE_YOUR_JWT_HERE",
+      "type": "string"
+    },
+    {
+      "key": "card_id",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    }
+  ]
+}

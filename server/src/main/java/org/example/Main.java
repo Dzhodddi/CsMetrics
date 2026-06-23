@@ -219,34 +219,34 @@ public class Main {
 
             if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 try {
-                    String clientIdHeader = exchange.getRequestHeaders().getFirst("X-Client-ID");
-                    if (clientIdHeader == null) {
-                        sendResponse(exchange, 400, "{\"error\": \"Missing X-Client-ID header\"}");
-                        return;
-                    }
-                    int clientId = Integer.parseInt(clientIdHeader);
-                    SecretKey aesKey = sessionKeyStore.getKey(clientId);
-                    if (aesKey == null) {
-                        sendResponse(exchange, 401, "{\"error\": \"Perform handshake first\"}");
-                        return;
-                    }
-
-                    JsonNode rootNode = mapper.readTree(exchange.getRequestBody());
-                    if (!rootNode.has("ciphertext")) {
-                        sendResponse(exchange, 400, "{\"error\": \"Missing ciphertext payload\"}");
-                        return;
-                    }
-
-                    byte[] encryptedBytes = Base64.getDecoder().decode(rootNode.get("ciphertext").asText());
-                    String decryptedJson = new String(AesUtil.decrypt(encryptedBytes, aesKey), StandardCharsets.UTF_8);
-                    LoginDto loginDto = mapper.readValue(decryptedJson, LoginDto.class);
+//                    String clientIdHeader = exchange.getRequestHeaders().getFirst("X-Client-ID");
+//                    if (clientIdHeader == null) {
+//                        sendResponse(exchange, 400, "{\"error\": \"Missing X-Client-ID header\"}");
+//                        return;
+//                    }
+//                    int clientId = Integer.parseInt(clientIdHeader);
+//                    SecretKey aesKey = sessionKeyStore.getKey(clientId);
+//                    if (aesKey == null) {
+//                        sendResponse(exchange, 401, "{\"error\": \"Perform handshake first\"}");
+//                        return;
+//                    }
+//
+//                    JsonNode rootNode = mapper.readTree(exchange.getRequestBody());
+//                    if (!rootNode.has("ciphertext")) {
+//                        sendResponse(exchange, 400, "{\"error\": \"Missing ciphertext payload\"}");
+//                        return;
+//                    }
+//
+//                    byte[] encryptedBytes = Base64.getDecoder().decode(rootNode.get("ciphertext").asText());
+//                    String decryptedJson = new String(AesUtil.decrypt(encryptedBytes, aesKey), StandardCharsets.UTF_8);
+                    LoginDto loginDto = mapper.readValue(exchange.getRequestBody(), LoginDto.class);
 
                     try {
                         String token = authService.authenticateAndGetToken(loginDto);
-                        String rawResponse = mapper.writeValueAsString(new TokenResponse(token));
-                        byte[] encryptedResponseBytes = AesUtil.encrypt(rawResponse.getBytes(StandardCharsets.UTF_8), aesKey);
-                        String encryptedResponseBase64 = Base64.getEncoder().encodeToString(encryptedResponseBytes);
-                        sendResponse(exchange, 200, "{\"ciphertext\": \"" + encryptedResponseBase64 + "\"}");
+//                        String rawResponse = mapper.writeValueAsString(new TokenResponse(token));
+//                        byte[] encryptedResponseBytes = AesUtil.encrypt(rawResponse.getBytes(StandardCharsets.UTF_8), aesKey);
+//                        String encryptedResponseBase64 = Base64.getEncoder().encodeToString(encryptedResponseBytes);
+                        sendResponse(exchange, 200, "{\"ciphertext\": \"" + token + "\"}");
                     } catch (Exception e) {
                         sendResponse(exchange, 401, "{\"error\": \"" + e.getMessage() + "\"}");
                     }
