@@ -95,7 +95,25 @@ public class Main {
         });
 
         server.createContext("/api/v1/login", exchange -> {
-            try { routeProxy.login(exchange); } catch (Exception e) {}
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                try {
+                    LoginDto loginDto = mapper.readValue(exchange.getRequestBody(), LoginDto.class);
+                    String token = authService.authenticateAndGetToken(loginDto);
+
+                    String response = "{\"token\":\"" + token + "\"}";
+                    byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(200, bytes.length);
+                    try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
+                } catch (Exception e) {
+                    byte[] error = "{\"error\": \"Unauthorized\"}".getBytes();
+                    exchange.sendResponseHeaders(401, error.length);
+                    try (OutputStream os = exchange.getResponseBody()) { os.write(error); }
+                }
+            } else {
+                exchange.sendResponseHeaders(405, -1);
+            }
+            exchange.close();
         });
 
         server.createContext("/api/v1/validate", exchange -> {

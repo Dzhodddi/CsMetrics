@@ -137,82 +137,27 @@ function base64ToArrayBuffer(b64) {
 async function handleLogin(e) {
     e.preventDefault();
     const loginBtn = document.getElementById('loginBtn');
-    const usernameValue = document.getElementById('username').value;
-    const passwordValue = document.getElementById('password').value;
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
 
     loginBtn.disabled = true;
-    loginBtn.innerText = 'Downloading...';
+    loginBtn.innerText = 'Signing in...';
 
     try {
-        const keyResponse = await fetch(`${BASE_URL}/public-key`);
-        if (!keyResponse.ok) throw new Error('Could not get key');
-        const { publicKey } = await keyResponse.json();
-
-        const rsaKeyBuffer = base64ToArrayBuffer(publicKey);
-        const serverPublicKey = await window.crypto.subtle.importKey(
-            "spki", rsaKeyBuffer, { name: "RSA-OAEP", hash: "SHA-512" }, false, ["encrypt"]
-        );
-
-        const rawAesKeyBytes = window.crypto.getRandomValues(new Uint8Array(32));
-        const aesKey = await window.crypto.subtle.importKey(
-            "raw", rawAesKeyBytes, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
-        );
-
-        const loginPayload = JSON.stringify({ username: usernameValue, password: passwordValue });
-        const encodedPayload = new TextEncoder().encode(loginPayload);
-        const iv = window.crypto.getRandomValues(new Uint8Array(12));
-
-        const encryptedDataBuffer = await window.crypto.subtle.encrypt(
-            { name: "AES-GCM", iv: iv, tagLength: 128 },
-            aesKey,
-            encodedPayload
-        );
-
-        const encryptedDataArray = new Uint8Array(encryptedDataBuffer);
-        const combinedPayload = new Uint8Array(iv.length + encryptedDataArray.length);
-        combinedPayload.set(iv, 0);
-        combinedPayload.set(encryptedDataArray, iv.length);
-        const ciphertextBase64 = window.btoa(String.fromCharCode(...combinedPayload));
-
-        const encryptedKeyBuffer = await window.crypto.subtle.encrypt(
-            { name: "RSA-OAEP" },
-            serverPublicKey,
-            rawAesKeyBytes
-        );
-        const encryptedKeyBase64 = window.btoa(String.fromCharCode(...new Uint8Array(encryptedKeyBuffer)));
-
         const response = await fetch(`${BASE_URL}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                encryptedKey: encryptedKeyBase64,
-                ciphertext: ciphertextBase64
-            })
+            body: JSON.stringify({ username, password })
         });
 
-        if (!response.ok) throw new Error('Authentication error');
+        if (!response.ok) throw new Error('Invalid credentials');
 
         const data = await response.json();
-
-        const serverEncryptedBytes = base64ToArrayBuffer(data.ciphertext);
-        const serverIv = new Uint8Array(serverEncryptedBytes, 0, 12);
-        const serverCiphertext = new Uint8Array(serverEncryptedBytes, 12);
-
-        const decryptedResponseBuffer = await window.crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: serverIv, tagLength: 128 },
-            aesKey,
-            serverCiphertext
-        );
-
-        const decryptedResponseJson = new TextDecoder().decode(decryptedResponseBuffer);
-        const responseData = JSON.parse(decryptedResponseJson);
-
-        token = responseData.token;
+        token = data.token;
         localStorage.setItem('token', token);
 
         parseTokenAndRole();
         showPage('dashboardPage');
-        metricsCurrentPage = 1;
         fetchMetrics(1);
     } catch (error) {
         alert("Authentication error: " + error.message);
