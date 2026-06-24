@@ -284,10 +284,11 @@ async function fetchUsers() {
             throw new Error();
         }
         const result = await response.json();
-
         usersCurrentPage = result.currentPage;
         usersTotalPages = result.totalPages || 1;
         renderUsers(result.data);
+        updateUsersPaginationControls(usersCurrentPage, usersTotalPages);
+
     } catch (err) {
         console.error("Failed to fetch users");
     }
