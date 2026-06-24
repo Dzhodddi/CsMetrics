@@ -381,7 +381,7 @@ async function handleCreateUser(e) {
             const errorData = await response.json();
             throw new Error(errorData.error || "Failed to create user");
         }
-        alert("User registered!");
+        alert("User registered");
         document.getElementById('createUserForm').reset();
         fetchUsers();
     } catch (err) {
@@ -414,9 +414,10 @@ async function handleUserAdminAction(actionType, structuralState, targetUser) {
             },
             body: JSON.stringify(payload)
         });
+
+        const data = await response.json();
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || "Action failed");
+            throw new Error(data.error || "Action failed");
         }
         fetchUsers();
     } catch (err) {

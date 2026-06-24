@@ -76,15 +76,25 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Invalid role");
         }
 
-        String salt = PasswordUtil.generateSalt();
-        String hashed = PasswordUtil.hashPassword(password, salt);
-        try (Connection conn = DatabaseConfig.getDataSource().getConnection();
-             PreparedStatement stmt = conn.prepareStatement("INSERT INTO users (username, password, salt, role) VALUES (?, ?, ?, ?)")) {
-            stmt.setString(1, targetUser);
-            stmt.setString(2, hashed);
-            stmt.setString(3, salt);
-            stmt.setString(4, role);
-            stmt.executeUpdate();
+        try (Connection conn = DatabaseConfig.getDataSource().getConnection()) {
+            try (PreparedStatement checkStmt = conn.prepareStatement("SELECT 1 FROM users WHERE username = ?")) {
+                checkStmt.setString(1, targetUser);
+                try (ResultSet rs = checkStmt.executeQuery()) {
+                    if (rs.next()) {
+                        throw new IllegalArgumentException("User with this username already exists");
+                    }
+                }
+            }
+
+            String salt = PasswordUtil.generateSalt();
+            String hashed = PasswordUtil.hashPassword(password, salt);
+            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO users (username, password, salt, role) VALUES (?, ?, ?, ?)")) {
+                stmt.setString(1, targetUser);
+                stmt.setString(2, hashed);
+                stmt.setString(3, salt);
+                stmt.setString(4, role);
+                stmt.executeUpdate();
+            }
         }
     }
 

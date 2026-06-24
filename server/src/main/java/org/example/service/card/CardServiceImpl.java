@@ -88,7 +88,7 @@ public class CardServiceImpl implements CardService {
             throw new SecurityException("Cannot update card with masked values");
         }
         String fingerprint = validateCardInput(input);
-        checkUniqueCard(fingerprint, null);
+        checkUniqueCard(fingerprint, cardId);
 
         byte[] encNumberBytes = AesUtil.encrypt(input.cardNumber().getBytes(StandardCharsets.UTF_8), dbEncryptionKey);
         byte[] encCvvBytes = AesUtil.encrypt(input.cvv().getBytes(StandardCharsets.UTF_8), dbEncryptionKey);
@@ -145,7 +145,7 @@ public class CardServiceImpl implements CardService {
             }
             ResultSet rs = stmt.executeQuery();
             if (rs.next() && rs.getInt(1) > 0) {
-                throw new IllegalArgumentException("Enter unique card number for card: " + currentId);
+                throw new IllegalArgumentException("Enter unique card number");
             }
         }
     }

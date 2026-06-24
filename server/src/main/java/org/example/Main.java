@@ -82,31 +82,24 @@ public class Main {
         server.createContext("/api/v1/internal/export-metrics", exchange -> {
             try { routeProxy.exportMetrics(exchange); } catch (Exception e) {}
         });
-
         server.createContext("/api/v1/validate", exchange -> {
             try { routeProxy.validate(exchange); } catch (Exception e) {}
         });
-
         server.createContext("/api/v1/load-data", exchange -> {
             try { routeProxy.loadData(exchange); } catch (Exception e) {}
         });
-
         server.createContext("/api/v1/cards", exchange -> {
             try { routeProxy.cards(exchange); } catch (Exception e) {}
         });
-
         server.createContext("/api/v1/cards/detail", exchange -> {
             try { routeProxy.cardsDetail(exchange); } catch (Exception e) {}
         });
-
         server.createContext("/api/v1/admin/users", exchange -> {
             try { routeProxy.adminUsers(exchange); } catch (Exception e) {}
         });
-
         server.createContext("/api/v1/metrics", exchange -> {
             try { routeProxy.metrics(exchange); } catch (Exception e) {}
         });
-
         server.createContext("/api/v1/login", exchange -> {
             try { routeProxy.login(exchange); } catch (Exception e) {}
         });
@@ -160,10 +153,7 @@ public class Main {
         private final UserService userService;
         private final AuthService authService;
 
-        public HttpRoutesImpl(DataService proxyDataService,
-                              CardService cardService,
-                              UserService userService,
-                              AuthService authService) {
+        public HttpRoutesImpl(DataService proxyDataService, CardService cardService, UserService userService, AuthService authService) {
             this.proxyDataService = proxyDataService;
             this.cardService = cardService;
             this.userService = userService;
@@ -204,19 +194,12 @@ public class Main {
                 try {
                     LoginDto loginDto = mapper.readValue(exchange.getRequestBody(), LoginDto.class);
                     String token = authService.authenticateAndGetToken(loginDto);
-
-                    String response = "{\"token\":\"" + token + "\"}";
-                    byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
-                    exchange.getResponseHeaders().set("Content-Type", "application/json");
-                    exchange.sendResponseHeaders(200, bytes.length);
-                    try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
+                    sendResponse(exchange, 200, "{\"token\":\"" + token + "\"}");
                 } catch (Exception e) {
-                    byte[] error = "{\"error\": \"Unauthorized\"}".getBytes();
-                    exchange.sendResponseHeaders(401, error.length);
-                    try (OutputStream os = exchange.getResponseBody()) { os.write(error); }
+                    sendResponse(exchange, 401, "{\"error\": \"Unauthorized\"}");
                 }
             } else {
-                exchange.sendResponseHeaders(405, -1);
+                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
             }
         }
 
@@ -229,10 +212,9 @@ public class Main {
                 sendResponse(exchange, 403, "{\"error\": \"Forbidden\"}");
                 return;
             }
-
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 proxyDataService.fastValidation();
-                sendResponse(exchange, 200, "{\"status\": \"success\", \"message\": \"Validation executed. Metric spawned!\"}");
+                sendResponse(exchange, 200, "{\"status\": \"success\", \"message\": \"Validation executed\"}");
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
             }
@@ -247,7 +229,6 @@ public class Main {
                 sendResponse(exchange, 403, "{\"error\": \"Forbidden\"}");
                 return;
             }
-
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 proxyDataService.loadData();
                 sendResponse(exchange, 200, "{\"status\":\"success\", \"action\":\"db_data_loaded\"}");
@@ -260,10 +241,7 @@ public class Main {
         @HttpRequestTimer(path = "/api/v1/cards", secured = true)
         public void cards(HttpExchange exchange) throws IOException {
             String role = validateJwtAndGetRole(exchange);
-            if (role == null) {
-                return;
-            }
-
+            if (role == null) return;
             String method = exchange.getRequestMethod();
             try {
                 if ("POST".equalsIgnoreCase(method)) {
@@ -272,23 +250,20 @@ public class Main {
                         return;
                     }
                     SecureCardRequestDto input = mapper.readValue(exchange.getRequestBody(), SecureCardRequestDto.class);
-                    try {
-                        UUID newId = cardService.createCard(input);
-                        sendResponse(exchange, 201, "{\"status\":\"created\", \"id\":\"" + newId + "\"}");
-                    } catch (IllegalArgumentException ex) {
-                        sendResponse(exchange, 400, "{\"error\": \"" + ex.getMessage() + "\"}");
-                    }
-                    return;
-                }
-
-                if ("GET".equalsIgnoreCase(method)) {
+                    UUID newId = cardService.createCard(input);
+                    sendResponse(exchange, 201, "{\"status\":\"created\", \"id\":\"" + newId + "\"}");
+                } else if ("GET".equalsIgnoreCase(method)) {
                     List<SecureCardResponseDto> cards = cardService.getCards(role);
                     sendResponse(exchange, 200, mapper.writeValueAsString(cards));
-                    return;
+                } else {
+                    sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
                 }
-                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
-            } catch (Exception e) {
-                sendResponse(exchange, 400, "{\"error\": \"Bad request\"}");
+            } catch (IllegalArgumentException ex) {
+                sendResponse(exchange, 400, "{\"error\": \"" + ex.getMessage() + "\"}");
+            } catch (Exception ex) {
+                Throwable cause = (ex.getCause() != null) ? ex.getCause() : ex;
+                String message = (cause.getMessage() != null) ? cause.getMessage() : "Operation failed";
+                sendResponse(exchange, 400, "{\"error\": \"" + message + "\"}");
             }
         }
 
@@ -296,23 +271,17 @@ public class Main {
         @HttpRequestTimer(path = "/api/v1/cards/detail", secured = true)
         public void cardsDetail(HttpExchange exchange) throws IOException {
             String role = validateJwtAndGetRole(exchange);
-            if (role == null) {
-                return;
-            }
-
+            if (role == null) return;
             String method = exchange.getRequestMethod();
             String query = exchange.getRequestURI().getQuery();
             UUID cardId = null;
-
             if (query != null && query.contains("id=")) {
                 cardId = UUID.fromString(query.split("id=")[1].split("&")[0]);
             }
-
             if (cardId == null) {
                 sendResponse(exchange, 400, "{\"error\": \"Missing id parameter\"}");
                 return;
             }
-
             try {
                 if ("PUT".equalsIgnoreCase(method)) {
                     if (!"ROLE_ADMIN".equals(role)) {
@@ -320,20 +289,13 @@ public class Main {
                         return;
                     }
                     SecureCardRequestDto input = mapper.readValue(exchange.getRequestBody(), SecureCardRequestDto.class);
-                    try {
-                        boolean updated = cardService.updateCard(cardId, input);
-                        if (updated) {
-                            sendResponse(exchange, 200, "{\"status\": \"updated\"}");
-                        } else {
-                            sendResponse(exchange, 404, "{\"error\": \"Card not found\"}");
-                        }
-                    } catch (IllegalArgumentException ex) {
-                        sendResponse(exchange, 400, "{\"error\": \"" + ex.getMessage() + "\"}");
+                    boolean updated = cardService.updateCard(cardId, input);
+                    if (updated) {
+                        sendResponse(exchange, 200, "{\"status\": \"updated\"}");
+                    } else {
+                        sendResponse(exchange, 404, "{\"error\": \"Card not found\"}");
                     }
-                    return;
-                }
-
-                if ("DELETE".equalsIgnoreCase(method)) {
+                } else if ("DELETE".equalsIgnoreCase(method)) {
                     if (!"ROLE_ADMIN".equals(role)) {
                         sendResponse(exchange, 403, "{\"error\": \"Forbidden\"}");
                         return;
@@ -344,11 +306,15 @@ public class Main {
                     } else {
                         sendResponse(exchange, 404, "{\"error\": \"Card not found\"}");
                     }
-                    return;
+                } else {
+                    sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
                 }
-                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
-            } catch (Exception e) {
-                sendResponse(exchange, 500, "{\"error\": \"Operation failed\"}");
+            } catch (IllegalArgumentException ex) {
+                sendResponse(exchange, 400, "{\"error\": \"" + ex.getMessage() + "\"}");
+            } catch (Exception ex) {
+                Throwable cause = (ex.getCause() != null) ? ex.getCause() : ex;
+                String message = (cause.getMessage() != null) ? cause.getMessage() : "Operation failed";
+                sendResponse(exchange, 400, "{\"error\": \"" + message + "\"}");
             }
         }
 
@@ -360,14 +326,11 @@ public class Main {
                 sendResponse(exchange, 403, "{\"error\": \"Forbidden\"}");
                 return;
             }
-
             String method = exchange.getRequestMethod();
-
             if ("GET".equalsIgnoreCase(method)) {
                 int page = 1;
                 int size = 2;
                 String searchQuery = "";
-
                 String query = exchange.getRequestURI().getQuery();
                 if (query != null) {
                     for (String param : query.split("&")) {
@@ -379,30 +342,22 @@ public class Main {
                         }
                     }
                 }
-
                 int offset = (page - 1) * size;
-
                 try {
                     Map<String, Object> searchResult = userService.searchUsers(searchQuery, size, offset);
-                    int totalCount = (int) searchResult.get("total");
-                    int totalPages = (int) Math.ceil((double) totalCount / size);
-
                     Map<String, Object> response = new HashMap<>();
                     response.put("currentPage", page);
-                    response.put("totalPages", totalPages);
+                    response.put("totalPages", (int) Math.ceil((double) (int) searchResult.get("total") / size));
                     response.put("data", searchResult.get("users"));
-
                     sendResponse(exchange, 200, mapper.writeValueAsString(response));
                 } catch (Exception e) {
                     sendResponse(exchange, 500, "{\"error\": \"Failed to fetch users\"}");
                 }
-
             } else if ("POST".equalsIgnoreCase(method)) {
                 try {
                     Map<String, Object> req = mapper.readValue(exchange.getRequestBody(), Map.class);
                     String targetUser = (String) req.get("username");
                     String action = (String) req.get("action");
-
                     if ("block".equalsIgnoreCase(action)) {
                         userService.blockUser(targetUser, (Boolean) req.get("block"));
                     } else if ("change_role".equalsIgnoreCase(action)) {
@@ -412,11 +367,13 @@ public class Main {
                     } else if ("delete".equalsIgnoreCase(action)) {
                         userService.deleteUser(targetUser);
                     }
-                    sendResponse(exchange, 200, "{\"status\": \"success\", \"message\": \"User action processed\"}");
+                    sendResponse(exchange, 200, "{\"status\": \"success\"}");
                 } catch (IllegalArgumentException e) {
                     sendResponse(exchange, 400, "{\"error\": \"" + e.getMessage() + "\"}");
                 } catch (Exception e) {
-                    sendResponse(exchange, 400, "{\"error\": \"Invalid admin request structure\"}");
+                    Throwable cause = (e.getCause() != null) ? e.getCause() : e;
+                    String message = (cause.getMessage() != null) ? cause.getMessage() : "Operation failed";
+                    sendResponse(exchange, 400, "{\"error\": \"" + message + "\"}");
                 }
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
@@ -427,25 +384,27 @@ public class Main {
         @HttpRequestTimer(path = "/api/v1/metrics", secured = true)
         public void metrics(HttpExchange exchange) throws IOException {
             String role = validateJwtAndGetRole(exchange);
-            if (role == null) return;
-
+            if (role == null) {
+                return;
+            }
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 int page = 1;
                 int size = 2;
-
                 String query = exchange.getRequestURI().getQuery();
                 if (query != null) {
                     for (String param : query.split("&")) {
                         String[] pair = param.split("=");
                         if (pair.length == 2) {
-                            if (pair[0].equals("page")) page = Integer.parseInt(pair[1]);
-                            if (pair[0].equals("size")) size = Integer.parseInt(pair[1]);
+                            if (pair[0].equals("page")) {
+                                page = Integer.parseInt(pair[1]);
+                            }
+                            if (pair[0].equals("size")) {
+                                size = Integer.parseInt(pair[1]);
+                            }
                         }
                     }
                 }
-
                 int offset = (page - 1) * size;
-
                 try (Connection conn = DatabaseConfig.getDataSource().getConnection()) {
                     int totalCount = 0;
                     try (PreparedStatement countStmt = conn.prepareStatement("SELECT COUNT(*) FROM metrics");
@@ -454,18 +413,13 @@ public class Main {
                             totalCount = rs.getInt(1);
                         }
                     }
-                    int totalPages = (int) Math.ceil((double) totalCount / size);
-
                     List<Map<String, Object>> data = new ArrayList<>();
-                    String sql = "SELECT * FROM metrics ORDER BY recorded_at DESC LIMIT ? OFFSET ?";
-                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    try (PreparedStatement stmt = conn.prepareStatement("SELECT * FROM metrics ORDER BY recorded_at DESC LIMIT ? OFFSET ?")) {
                         stmt.setInt(1, size);
                         stmt.setInt(2, offset);
                         try (ResultSet rs = stmt.executeQuery()) {
                             while (rs.next()) {
                                 Map<String, Object> map = new HashMap<>();
-                                map.put("id", rs.getString("id"));
-                                map.put("className", rs.getString("class_name"));
                                 map.put("methodName", rs.getString("method_name"));
                                 map.put("durationNs", rs.getLong("duration_ns"));
                                 map.put("recordedAt", rs.getTimestamp("recorded_at").getTime());
@@ -475,16 +429,13 @@ public class Main {
                             }
                         }
                     }
-
                     Map<String, Object> result = new HashMap<>();
                     result.put("currentPage", page);
-                    result.put("totalPages", totalPages);
+                    result.put("totalPages", (int) Math.ceil((double) totalCount / size));
                     result.put("data", data);
-
                     sendResponse(exchange, 200, mapper.writeValueAsString(result));
-
                 } catch (Exception e) {
-                    sendResponse(exchange, 500, "{\"error\": \"Database error while fetching metrics\"}");
+                    sendResponse(exchange, 500, "{\"error\": \"Database error\"}");
                 }
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
