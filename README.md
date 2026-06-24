@@ -22,10 +22,11 @@ See here [https://drive.google.com/file/d/18sSi5CrrTByBRD0VDkBOxKKv0bX2TIPe/view
 ## Tech Stack
 - **Language:** Java 17+
 - **Database:** PostgreSQL
-- **Connection pool:** HikariCP
+- **Database connection pool:** HikariCP
 - **API:** REST API
+- **Network protocols:** TCP, HTTP
 - **Build tool:** Maven
-- **Reverse Proxy:** Nginx
+- **Reverse proxy:** Nginx
 - **Containerization & Deployment:** Docker
 
 ## Project Structure
