@@ -14,19 +14,41 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: always
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  backend:
+  app-server:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: metrics_backend
+    container_name: metrics_server
+    command: java -jar server.jar
     ports:
       - "8080:8080"
     environment:
       - DB_URL=jdbc:postgresql://db:5432/metrics_db
       - TZ=Europe/Kyiv
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+  app-core:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: metrics_core
+    command: java -jar core.jar
+    environment:
+      - DB_URL=jdbc:postgresql://db:5432/metrics_db
+      - TCP_PORT=9090
+      - TZ=Europe/Kyiv
+    depends_on:
+      db:
+        condition: service_healthy
     restart: on-failure
 
   frontend:
@@ -37,7 +59,8 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      - app-server
+      - app-core
     restart: always
 
 volumes:

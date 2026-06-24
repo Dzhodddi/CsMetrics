@@ -13,8 +13,3 @@ WORKDIR /app
 
 COPY --from=builder /app/core/target/*-shaded.jar core.jar
 COPY --from=builder /app/server/target/*-shaded.jar server.jar
-
-EXPOSE 8080
-EXPOSE 8081
-
-ENTRYPOINT ["sh", "-c", "java -jar server.jar & sleep 5 && java -jar core.jar"]

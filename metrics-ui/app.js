@@ -320,10 +320,12 @@ async function handleDeleteCard(cardId) {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!response.ok) throw new Error();
+        if (!response.ok) {
+            throw new Error();
+        }
         fetchCards();
     } catch (err) {
-        alert("Deletion failed.");
+        alert("Deletion failed");
     }
 }
 
@@ -333,7 +335,9 @@ async function fetchUsers() {
         const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!response.ok) throw new Error();
+        if (!response.ok) {
+            throw new Error();
+        }
         const result = await response.json();
 
         usersCurrentPage = result.currentPage;
@@ -364,7 +368,7 @@ function renderUsers(users) {
             <h4><strong>${escapeHtml(user.username)}</strong> ${blockedStatus}</h4>
             <p style="color:#A0A8B5; font-family: monospace;">Role: ${escapeHtml(user.role)}</p>
             <div style="display: flex; gap: 8px; margin-top: 10px;">
-                ${user.username !== currentUser ? `
+                ${user.username !== currentUser && user.role !== "ROLE_ADMIN" ? `
                     <button onclick="handleUserAdminAction('block', ${!user.isBlocked}, '${escapeHtml(user.username)}')" 
                             style="background:${user.isBlocked ? '#4ecdc4' : '#FF9A42'}; border:none; color:black; padding:4px 8px; border-radius:4px; cursor:pointer;">
                         ${user.isBlocked ? 'Unblock' : 'Block'}
@@ -486,7 +490,9 @@ async function fetchMetrics(page) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (!tableResponse.ok) throw new Error();
+        if (!tableResponse.ok) {
+            throw new Error();
+        }
 
         const tableResult = await tableResponse.json();
         metricsCurrentPage = tableResult.currentPage;

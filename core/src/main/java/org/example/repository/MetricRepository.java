@@ -30,7 +30,7 @@ public class MetricRepository {
         params.put("hostName", metric.hostName());
         params.put("className", metric.className());
         params.put("methodName", metric.methodName());
-        params.put("durationNs", metric.durationNs() != null ? metric.durationNs() : java.sql.Types.NULL);
+        params.put("durationNs", metric.durationNs());
         params.put("metadata", metric.metadata() != null ? metric.metadata() : "{}");
         params.put("secured", metric.secured());
 
