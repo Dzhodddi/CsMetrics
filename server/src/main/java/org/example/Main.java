@@ -95,25 +95,7 @@ public class Main {
         });
 
         server.createContext("/api/v1/login", exchange -> {
-            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                try {
-                    LoginDto loginDto = mapper.readValue(exchange.getRequestBody(), LoginDto.class);
-                    String token = authService.authenticateAndGetToken(loginDto);
-
-                    String response = "{\"token\":\"" + token + "\"}";
-                    byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
-                    exchange.getResponseHeaders().set("Content-Type", "application/json");
-                    exchange.sendResponseHeaders(200, bytes.length);
-                    try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
-                } catch (Exception e) {
-                    byte[] error = "{\"error\": \"Unauthorized\"}".getBytes();
-                    exchange.sendResponseHeaders(401, error.length);
-                    try (OutputStream os = exchange.getResponseBody()) { os.write(error); }
-                }
-            } else {
-                exchange.sendResponseHeaders(405, -1);
-            }
-            exchange.close();
+            try { routeProxy.login(exchange); } catch (Exception e) {}
         });
 
         server.createContext("/api/v1/validate", exchange -> {
@@ -236,30 +218,14 @@ public class Main {
 
             if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 try {
-                    com.fasterxml.jackson.databind.JsonNode rootNode = mapper.readTree(exchange.getRequestBody());
-                    if (!rootNode.has("encryptedKey") || !rootNode.has("ciphertext")) {
-                        sendResponse(exchange, 400, "{\"error\": \"Missing encryptedKey or ciphertext payload\"}");
-                        return;
-                    }
-                    byte[] encryptedAesKeyBytes = Base64.getDecoder().decode(rootNode.get("encryptedKey").asText());
-                    byte[] decryptedAesKeyBytes = RsaUtil.decrypt(encryptedAesKeyBytes, rsaKeyPair.getPrivate());
-                    SecretKey sessionAesKey = AesUtil.getSecretKeyFromBytes(decryptedAesKeyBytes);
-                    byte[] ciphertextBytes = Base64.getDecoder().decode(rootNode.get("ciphertext").asText());
-                    byte[] decryptedJsonBytes = AesUtil.decrypt(ciphertextBytes, sessionAesKey);
-                    String decryptedJson = new String(decryptedJsonBytes, StandardCharsets.UTF_8);
+                    LoginDto loginDto = mapper.readValue(exchange.getRequestBody(), LoginDto.class);
+                    String token = authService.authenticateAndGetToken(loginDto);
 
-                    LoginDto loginDto = mapper.readValue(decryptedJson, LoginDto.class);
-
-                    try {
-                        String token = authService.authenticateAndGetToken(loginDto);
-                        String rawResponse = "{\"token\":\"" + token + "\"}";
-                        byte[] encryptedResponseBytes = AesUtil.encrypt(rawResponse.getBytes(StandardCharsets.UTF_8), sessionAesKey);
-                        String encryptedResponseBase64 = Base64.getEncoder().encodeToString(encryptedResponseBytes);
-
-                        sendResponse(exchange, 200, "{\"ciphertext\": \"" + encryptedResponseBase64 + "\"}");
-                    } catch (Exception e) {
-                        sendResponse(exchange, 401, "{\"error\": \"" + e.getMessage() + "\"}");
-                    }
+                    String response = "{\"token\":\"" + token + "\"}";
+                    byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(200, bytes.length);
+                    try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
                 } catch (Exception e) {
                     sendResponse(exchange, 400, "{\"error\": \"Bad request format or decryption error\"}");
                 }
