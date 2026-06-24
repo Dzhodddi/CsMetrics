@@ -10,7 +10,6 @@ import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyPair;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -32,9 +31,8 @@ import org.example.reporters.HttpMetricsReporter;
 import org.example.reporters.MetricsReporter;
 import org.example.service.auth.AuthService;
 import org.example.tcp.TcpMetricClient;
+import org.example.utility.AesUtil;
 import org.example.utility.JwtUtil;
-import org.example.utility.cryptography.RsaUtil;
-import org.example.utility.cryptography.AesUtil;
 import org.example.service.data.DataService;
 import org.example.service.data.DataServiceImpl;
 import org.example.service.auth.AuthServiceImpl;
@@ -47,21 +45,12 @@ public class Main {
     private static final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
 
-    private static final KeyPair rsaKeyPair;
     private static final ConcurrentLinkedQueue<MetricDto> metricsStorage = new ConcurrentLinkedQueue<>();
     private static final SecretKey dbEncryptionKey = AesUtil.getSecretKeyFromBytes(
             "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8)
     );
     private static final int SERVER_PORT = 9090;
     private static final String SERVER_HOST = "app-core";
-
-    static {
-        try {
-            rsaKeyPair = RsaUtil.generateKeyPair();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize server RSA keys", e);
-        }
-    }
 
     public static void main(String[] args) throws Exception {
         DatabaseConfig.getDataSource();
@@ -118,12 +107,12 @@ public class Main {
             try { routeProxy.adminUsers(exchange); } catch (Exception e) {}
         });
 
-        server.createContext("/api/v1/public-key", exchange -> {
-            try { routeProxy.publicKey(exchange); } catch (Exception e) {}
-        });
-
         server.createContext("/api/v1/metrics", exchange -> {
             try { routeProxy.metrics(exchange); } catch (Exception e) {}
+        });
+
+        server.createContext("/api/v1/login", exchange -> {
+            try { routeProxy.login(exchange); } catch (Exception e) {}
         });
 
         server.setExecutor(Executors.newFixedThreadPool(12));
@@ -166,7 +155,6 @@ public class Main {
         void cards(HttpExchange exchange) throws IOException;
         void cardsDetail(HttpExchange exchange) throws IOException;
         void adminUsers(HttpExchange exchange) throws IOException;
-        void publicKey(HttpExchange exchange) throws IOException;
         void metrics(HttpExchange exchange) throws IOException;
     }
 
@@ -227,8 +215,12 @@ public class Main {
                     exchange.sendResponseHeaders(200, bytes.length);
                     try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
                 } catch (Exception e) {
-                    sendResponse(exchange, 400, "{\"error\": \"Bad request format or decryption error\"}");
+                    byte[] error = "{\"error\": \"Unauthorized\"}".getBytes();
+                    exchange.sendResponseHeaders(401, error.length);
+                    try (OutputStream os = exchange.getResponseBody()) { os.write(error); }
                 }
+            } else {
+                exchange.sendResponseHeaders(405, -1);
             }
         }
 
@@ -429,35 +421,6 @@ public class Main {
                     sendResponse(exchange, 400, "{\"error\": \"" + e.getMessage() + "\"}");
                 } catch (Exception e) {
                     sendResponse(exchange, 400, "{\"error\": \"Invalid admin request structure\"}");
-                }
-            } else {
-                sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");
-            }
-        }
-
-        @Override
-        @HttpRequestTimer(path = "/api/v1/public-key")
-        public void publicKey(HttpExchange exchange) throws IOException {
-            String origin = exchange.getRequestHeaders().getFirst("Origin");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin != null ? origin : "http://127.0.0.1:3000");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, OPTIONS");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
-
-            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(200, -1);
-                exchange.close();
-                return;
-            }
-
-            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                try {
-                    byte[] publicKeyBytes = rsaKeyPair.getPublic().getEncoded();
-                    String base64PublicKey = Base64.getEncoder().encodeToString(publicKeyBytes);
-                    String jsonResponse = "{\"publicKey\": \"" + base64PublicKey + "\"}";
-                    sendResponse(exchange, 200, jsonResponse);
-                } catch (Exception e) {
-                    sendResponse(exchange, 500, "{\"error\": \"Failed to retrieve public key\"}");
                 }
             } else {
                 sendResponse(exchange, 405, "{\"error\": \"Method not allowed\"}");

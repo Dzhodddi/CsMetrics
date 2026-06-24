@@ -12,7 +12,7 @@ import javax.crypto.SecretKey;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.example.annotations.DbQueryTimer;
 import org.example.config.DatabaseConfig;
-import org.example.utility.cryptography.AesUtil;
+import org.example.utility.AesUtil;
 import org.example.dtos.card.SecureCardRequestDto;
 import org.example.dtos.card.SecureCardResponseDto;
 
