@@ -465,7 +465,6 @@ public class Main {
         }
 
         @Override
-        @HttpRequestTimer(path = "/api/v1/metrics", secured = true)
         public void metrics(HttpExchange exchange) throws IOException {
             String role = validateJwtAndGetRole(exchange);
             if (role == null) return;
