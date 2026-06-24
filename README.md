@@ -10,7 +10,7 @@ The system supports:
 - Docker-based deployment
 
 ## Tech Task
-See here [https://drive.google.com/file/d/18sSi5CrrTByBRD0VDkBOxKKv0bX2TIPe/view?usp=sharing](https://drive.google.com/file/d/18sSi5CrrTByBRD0VDkBOxKKv0bX2TIPe/view?usp=sharing)
+See here [https://ukmaedu-my.sharepoint.com/:b:/g/personal/k_astashenkova_ukma_edu_ua/IQDIG7odSLWKSKFyWVIMhVe_Ae-vXKhGVg4o9rx4AK09fx0?e=JCmA2b](https://ukmaedu-my.sharepoint.com/:b:/g/personal/k_astashenkova_ukma_edu_ua/IQDIG7odSLWKSKFyWVIMhVe_Ae-vXKhGVg4o9rx4AK09fx0?e=JCmA2b)
 
 ## Features
 - **Metrics Collection** — a planner polls all recorded metrics at a configured recording interval to save the retrieved values. It supports DB and HTTP API metric types.
