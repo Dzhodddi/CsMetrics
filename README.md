@@ -1,6 +1,13 @@
 # 📊 Metrics Collection Service 📊
-*The system is a Java server application that provides an HTTP API on a dedicated port and encrypted packages TCP exchange in the background. The service runs in the background on a schedule to collect metrics from servers (agents) and stores them in a time-series-oriented database. 
-Clients can view the collected data through a separate, intuitive, and simplified interface.*
+*A Java-based metrics collection platform that gathers performance data from applications, stores it in PostgreSQL, and provides a REST API and web interface for monitoring and analysis.*
+
+The system supports:
+- сollection of execution metrics using annotations and dynamic proxies
+- transmission of metrics over TCP using custom binary packets
+- storage of collected metrics in PostgreSQL
+- REST API for accessing metrics data
+- web dashboard for visualizing collected metrics
+- Docker-based deployment
 
 ## Tech Task
 See here [https://drive.google.com/file/d/18sSi5CrrTByBRD0VDkBOxKKv0bX2TIPe/view?usp=sharing](https://drive.google.com/file/d/18sSi5CrrTByBRD0VDkBOxKKv0bX2TIPe/view?usp=sharing)
@@ -16,7 +23,10 @@ See here [https://drive.google.com/file/d/18sSi5CrrTByBRD0VDkBOxKKv0bX2TIPe/view
 - **Language:** Java 17+
 - **Database:** PostgreSQL
 - **Connection pool:** HikariCP
+- **API:** REST API
 - **Build tool:** Maven
+- **Reverse Proxy:** Nginx
+- **Containerization & Deployment:** Docker
 
 ## Project Structure
 The project is divided into three Maven modules.
