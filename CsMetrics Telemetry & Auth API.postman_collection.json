@@ -3,9 +3,7 @@
     "_postman_id": "6e250f22-ebb1-4f4e-aceb-8a342d5a1017",
     "name": "CsMetrics Telemetry & Auth API",
     "description": "API collection for the CsMetrics Java HttpServer. Includes routes for secure cards, user administration, and internal metrics.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "44257974",
-    "_collection_link": "https://go.postman.co/collection/44257974-6e250f22-ebb1-4f4e-aceb-8a342d5a1017?source=collection_link"
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
@@ -31,6 +29,45 @@
             "description": "Polls the ConcurrentLinkedQueue and exports gathered metrics."
           },
           "response": []
+        },
+        {
+          "name": "Get Metrics (DB)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/metrics?page=1&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "metrics"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -38,7 +75,7 @@
       "name": "Authentication",
       "item": [
         {
-          "name": "Login (Encrypted)",
+          "name": "Login",
           "event": [
             {
               "listen": "test",
@@ -47,33 +84,26 @@
                   "// 1. Ensure the request was successful",
                   "if (pm.response.code === 200) {",
                   "    try {",
-                  "        // 2. Parse the outer response: { \"ciphertext\": \"...\" }",
+                  "        // 2. Parse the response: { \"token\": \"...\" }",
                   "        var responseData = pm.response.json();",
                   "        ",
-                  "        if (responseData.ciphertext) {",
-                  "            pm.collectionVariables.set(\"token\", responseData.ciphertext);",
+                  "        if (responseData.token) {",
+                  "            pm.collectionVariables.set(\"token\", responseData.token);",
                   "        } else {",
-                  "            console.warn(\"No 'ciphertext' field found in the response.\");",
+                  "            console.warn(\"No 'token' field found in the response.\");",
                   "        }",
                   "    } catch (e) {",
                   "        console.error(\"Failed to parse the response or extract the token.\", e);",
                   "    }",
                   "}"
                 ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
+                "type": "text/javascript"
               }
             }
           ],
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "X-Client-ID",
-                "value": "1",
-                "description": "Must match a clientId registered in SessionKeyStore"
-              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -98,8 +128,7 @@
                 "v1",
                 "login"
               ]
-            },
-            "description": "Note: The payload must be an AES-encrypted, Base64-encoded string representing the LoginDto: `{\"username\": \"admin\", \"password\": \"password\"}`."
+            }
           },
           "response": []
         }
@@ -223,7 +252,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"title\": \"Primary Groceries\",\n  \"holderName\": \"Alice Smith\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cvv\": \"123\"\n}",
+              "raw": "{\n  \"title\": \"Primary Groceries\",\n  \"holderName\": \"Alice Smith\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cvv\": \"123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -266,7 +295,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{card_id}}\",\n  \"title\": \"Updated Card Title\",\n  \"holderName\": \"Alice Smith\",\n  \"cardNumber\": \"4222222222222222\",\n  \"cvv\": \"999\"\n}",
+              "raw": "{\n  \"title\": \"Updated Card Title\",\n  \"holderName\": \"Alice Smith\",\n  \"cardNumber\": \"4222222222222222\",\n  \"cvv\": \"999\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -338,6 +367,52 @@
       "name": "Admin",
       "item": [
         {
+          "name": "Search Users",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users?page=1&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "query",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Requires ROLE_ADMIN token"
+          },
+          "response": []
+        },
+        {
           "name": "Create User",
           "request": {
             "auth": {
@@ -404,7 +479,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"target_user\",\n  \"action\": \"change_role\",\n  \"role\": \"ROLE_USER\"\n}",
+              "raw": "{\n  \"username\": \"target_user\",\n  \"action\": \"change_role\",\n  \"role\": \"ROLE_READER\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -423,7 +498,7 @@
                 "users"
               ]
             },
-            "description": "Requires ROLE_ADMIN token"
+            "description": "Requires ROLE_ADMIN token. Valid roles: ROLE_ADMIN, ROLE_READER"
           },
           "response": []
         },
@@ -450,6 +525,51 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"target_user\",\n  \"action\": \"block\",\n  \"block\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN token"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"target_user\",\n  \"action\": \"delete\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
