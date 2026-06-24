@@ -1,16 +1,13 @@
 package org.example.tcp;
 
-import org.example.dtos.MetricDto;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.example.network.PacketCodec;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.util.List;
-
+import org.example.dtos.MetricDto;
+import org.example.network.PacketCodec;
 
 public class TcpMetricClient implements AutoCloseable {
 

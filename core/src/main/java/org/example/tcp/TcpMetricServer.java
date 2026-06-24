@@ -3,10 +3,6 @@ package org.example.tcp;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.example.dtos.MetricDto;
-import org.example.network.BinaryPacket;
-import org.example.network.PacketCodec;
-
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -18,6 +14,9 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import org.example.dtos.MetricDto;
+import org.example.network.BinaryPacket;
+import org.example.network.PacketCodec;
 
 public class TcpMetricServer {
 
