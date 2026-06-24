@@ -1,8 +1,8 @@
-package org.example.service;
+package org.example.service.data;
 
 import org.example.annotations.DbQueryTimer;
 
-public class DefaultDataService implements DataService {
+public class DataServiceImpl implements DataService {
 
     @DbQueryTimer(dbName = "load some data", queryAction = "load some data")
     @Override

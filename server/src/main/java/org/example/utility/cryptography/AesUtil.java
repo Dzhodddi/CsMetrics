@@ -1,4 +1,4 @@
-package org.example.cryptography;
+package org.example.utility.cryptography;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;

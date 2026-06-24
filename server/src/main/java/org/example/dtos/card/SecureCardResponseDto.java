@@ -1,8 +1,8 @@
-package org.example.dtos;
+package org.example.dtos.card;
 
 import java.util.UUID;
 
-public record SecureCardDto(
+public record SecureCardResponseDto(
         UUID id,
         String title,
         String holderName,

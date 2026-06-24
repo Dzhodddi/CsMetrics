@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Server Performance Analytics Dashboard</title>
+  <title>Metrics Service</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,7 +21,7 @@
 
   <div id="dashboardPage" class="dashboard-container hidden">
     <header class="dashboard-header">
-      <h1>Dashboard Engine</h1>
+      <h1>Metrics Service Dashboard</h1>
       <nav class="tab-navigation">
         <button onclick="switchTab('metricsTab')" class="nav-tab active">Metrics</button>
         <button onclick="switchTab('cardsTab')" class="nav-tab">Secure Cards</button>
@@ -34,7 +34,7 @@
     <div id="loader" class="loader hidden">Downloading...</div>
 
     <div id="metricsTab" class="tab-content">
-      <div class="action-bar">
+      <div class="action-bar admin-only">
         <div class="action-buttons">
           <button id="btnValidate" class="action-btn validate">Trigger Validate</button>
           <button id="btnLoad" class="action-btn load">Trigger Load Data</button>
@@ -69,18 +69,21 @@
     </div>
 
     <div id="cardsTab" class="tab-content hidden">
-      <div class="cards-grid-layout">
-        <div class="card-form-panel">
-          <h3>Add new card</h3>
+      <div class="cards-grid-layout" style="display: flex; gap: 20px;">
+        <div class="card-form-panel admin-only" style="flex: 0 0 300px;">
+          <h3 id="formTitle">Add new card</h3>
           <form id="secureCardForm" class="vertical-form">
-            <input type="text" id="cardTitle" placeholder="Name" required>
-            <input type="text" id="cardHolder" placeholder="Owner" required>
-            <input type="text" id="cardNumber" placeholder="Number" required>
-            <input type="text" id="cardCvv" placeholder="CVV" maxlength="3" required>
-            <button type="submit">Save</button>
+            <input type="text" id="cardTitle" placeholder="Name (max 50)" maxlength="50" required>
+            <input type="text" id="cardHolder" placeholder="Owner (max 50)" maxlength="50" required>
+            <input type="text" id="cardNumber" placeholder="Number (16 digits)" pattern="\d{16}" title="Exactly 16 digits" required>
+            <input type="text" id="cardCvv" placeholder="CVV (3 digits)" pattern="\d{3}" title="Exactly 3 digits" maxlength="3" required>
+            <div style="display: flex; gap: 10px;">
+              <button type="submit" style="flex: 2;">Save</button>
+              <button type="button" id="btnCancelEdit" class="hidden" onclick="cancelEdit()" style="flex: 1; background: #4B6A7D;">Cancel</button>
+            </div>
           </form>
         </div>
-        <div class="card-list-panel">
+        <div class="card-list-panel" style="flex: 1;">
           <h3>Existing cards</h3>
           <div id="cardsContainer" class="cards-list"></div>
 
@@ -94,26 +97,34 @@
     </div>
 
     <div id="usersTab" class="tab-content hidden admin-only">
-      <div class="users-management-panel">
-        <div class="card-form-panel">
-          <h3>Add new user</h3>
+      <div class="cards-grid-layout" style="display: flex; gap: 20px;">
+
+        <div class="card-form-panel admin-only" style="flex: 0 0 300px;">
+          <h3>Create user</h3>
           <form id="createUserForm" class="vertical-form">
-            <input type="text" id="newUsername" placeholder="Username" required>
-            <input type="password" id="newPassword" placeholder="Password" required>
-            <select id="newRole">
+            <input type="text" id="newUsername" placeholder="Username (3-20 chars)" pattern="^[a-zA-Z0-9_]{3,20}$" required>
+            <input type="password" id="newPassword" placeholder="Password (min 6)" minlength="6" required>
+            <select id="newRole" required>
               <option value="ROLE_READER">ROLE_READER</option>
               <option value="ROLE_ADMIN">ROLE_ADMIN</option>
             </select>
             <button type="submit">Register</button>
           </form>
         </div>
-        <div class="user-actions-panel">
-          <div class="vertical-form" style="flex-direction:row; gap:10px;">
-            <input type="text" id="actionUsername" placeholder="username" required>
-            <button onclick="handleUserAdminAction('block', true)" style="background:#ff4d4d; color:white;">Block</button>
-            <button onclick="handleUserAdminAction('block', false)" style="background:#4ecdc4; color:black;">Unblock</button>
+
+        <div class="card-list-panel" style="flex: 1;">
+          <input type="text" id="userSearchInput" placeholder="Enter username"
+                 style="width: 100%; padding: 10px; margin-bottom: 15px; background: #0F1720; border: 1px solid #4B6A7D; color: #F5F7FA; border-radius: 4px;">
+
+          <div id="usersContainer" class="cards-list" style="display: grid; grid-template-columns: 1fr;"></div>
+
+          <div class="pagination-wrapper" style="margin-top: 15px;">
+            <button id="btnUsersBack">Back</button>
+            <span id="usersPageInfo">Page 1 of 1</span>
+            <button id="btnUsersNext">Next</button>
           </div>
         </div>
+
       </div>
     </div>
 

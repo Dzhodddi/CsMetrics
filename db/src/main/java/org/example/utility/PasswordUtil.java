@@ -29,7 +29,7 @@ public class PasswordUtil {
             byte[] hashedBytes = factory.generateSecret(spec).getEncoded();
             return Base64.getEncoder().encodeToString(hashedBytes);
         } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-            throw new RuntimeException("Помилка під час хешування пароля", e);
+            throw new RuntimeException("Error hashing password", e);
         } finally {
             spec.clearPassword();
         }

@@ -247,7 +247,7 @@ button:disabled, .action-btn:disabled {
     gap: 20px;
 }
 
-.secure-card-item {
+.card-item {
     background: var(--bg-dark);
     padding: 20px;
     border-radius: 8px;
@@ -259,19 +259,19 @@ button:disabled, .action-btn:disabled {
     flex-direction: column;
 }
 
-.secure-card-item h4 {
+.card-item h4 {
     margin: 0 0 12px 0;
     font-size: 1.1rem;
     color: var(--text-primary);
 }
 
-.secure-card-item p {
+.card-item p {
     margin: 6px 0;
     font-size: 0.9rem;
     color: var(--text-secondary);
 }
 
-.secure-card-item code {
+.card-item code {
     font-size: 0.95rem;
     color: var(--accent-yellow);
 }

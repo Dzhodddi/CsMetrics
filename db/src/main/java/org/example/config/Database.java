@@ -42,14 +42,15 @@ public class Database implements AutoCloseable {
 
             try (Statement stmt = connection.createStatement()) {
                 stmt.execute("""
-                CREATE TABLE IF NOT EXISTS secure_cards (
-                    id UUID PRIMARY KEY,
-                    title VARCHAR(100) NOT NULL,
-                    holder_name VARCHAR(100) NOT NULL,
-                    encrypted_card_number VARCHAR(255) NOT NULL,
-                    encrypted_cvv VARCHAR(50) NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
+                     CREATE TABLE IF NOT EXISTS secure_cards (
+                     id UUID PRIMARY KEY,
+                     title VARCHAR(100) NOT NULL,
+                     holder_name VARCHAR(100) NOT NULL,
+                     encrypted_card_number VARCHAR(255) NOT NULL,
+                     encrypted_cvv VARCHAR(50) NOT NULL,
+                     card_fingerprint VARCHAR(64) UNIQUE,
+                     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+                 )
                 """);
             }
 
@@ -63,7 +64,8 @@ public class Database implements AutoCloseable {
                     class_name VARCHAR(255),
                     method_name VARCHAR(255),
                     duration_ns BIGINT,
-                    metadata JSONB
+                    metadata JSONB,
+                    secured BOOLEAN DEFAULT FALSE
                 )
                 """);
             }

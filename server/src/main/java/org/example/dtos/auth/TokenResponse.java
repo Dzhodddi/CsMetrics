@@ -1,4 +1,4 @@
-package org.example.dtos;
+package org.example.dtos.auth;
 
 public record TokenResponse(String token) {
 }

@@ -1,15 +1,16 @@
-package org.example.service;
+package org.example.service.auth;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import org.example.config.DatabaseConfig;
-import org.example.dtos.LoginDto;
+import org.example.dtos.auth.LoginDto;
 import org.example.utility.JwtUtil;
 import org.example.utility.PasswordUtil;
 
-public class AuthService {
+public class AuthServiceImpl implements AuthService {
 
+    @Override
     public String authenticateAndGetToken(LoginDto loginDto) throws Exception {
         try (Connection conn = DatabaseConfig.getDataSource().getConnection();
              PreparedStatement stmt = conn.prepareStatement("SELECT password, salt, role, is_blocked FROM users WHERE username = ?")) {
