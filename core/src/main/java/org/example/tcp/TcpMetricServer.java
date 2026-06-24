@@ -1,13 +1,19 @@
 package org.example.tcp;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.example.dtos.MetricDto;
+import org.example.network.BinaryPacket;
+import org.example.network.PacketCodec;
 
+import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,6 +24,7 @@ public class TcpMetricServer {
     private final int port;
     private final Consumer<List<MetricDto>> handler;
     private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private volatile boolean running = false;
     private ServerSocket serverSocket;
@@ -51,27 +58,41 @@ public class TcpMetricServer {
     private void handleClient(Socket socket) {
         String remote = socket.getRemoteSocketAddress().toString();
         System.out.println("TCP Server Client connected: " + remote);
-        try (ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
+        try (DataInputStream dis = new DataInputStream(socket.getInputStream())) {
             while (running) {
                 try {
-                    Object obj = ois.readObject();
-                    if (obj instanceof List<?> list) {
-                        @SuppressWarnings("unchecked")
-                        List<MetricDto> dtos = (List<MetricDto>) list;
-                        handler.accept(dtos);
-                    } else {
-                        System.err.println("TCP Server Unexpected object type: " + obj.getClass());
+                    byte[] header = new byte[7];
+                    dis.readFully(header);
+                    
+                    int payloadLength = ByteBuffer.wrap(header, 3, 4).getInt();
+                    if (payloadLength < 0 || payloadLength > 10 * 1024 * 1024) {
+                        System.err.println("TCP Server Invalid payload length: " + payloadLength);
+                        break;
                     }
+                    
+                    byte[] payload = new byte[payloadLength];
+                    dis.readFully(payload);
+                    
+                    byte[] fullPacket = new byte[7 + payloadLength];
+                    System.arraycopy(header, 0, fullPacket, 0, 7);
+                    System.arraycopy(payload, 0, fullPacket, 7, payloadLength);
+                    
+                    BinaryPacket packet = PacketCodec.parse(fullPacket);
+                    List<MetricDto> dtos = mapper.readValue(packet.encryptedPayload(), new TypeReference<>() {});
+                    handler.accept(dtos);
                 } catch (EOFException e) {
                     break;
-                } catch (ClassNotFoundException e) {
-                    System.err.println("TCP Server Unknown class received: " + e.getMessage());
+                } catch (Exception e) {
+                    System.err.println("TCP Server error processing packet: " + e.getMessage());
+                    break;
                 }
             }
         } catch (SocketException e) {
             System.out.println("TCP Server Client disconnected: " + remote);
         } catch (IOException e) {
             System.err.println("TCP Server IO error with client " + remote + ": " + e.getMessage());
+        } finally {
+            try { socket.close(); } catch (IOException ignored) {}
         }
     }
 
